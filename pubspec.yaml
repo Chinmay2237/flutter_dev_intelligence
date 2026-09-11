@@ -27,7 +27,6 @@ executables:
 
 topics:
   - flutter
-  - dart
   - developer-tools
   - debugging
   - performance
