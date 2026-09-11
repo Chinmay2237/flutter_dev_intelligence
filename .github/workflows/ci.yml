@@ -1,0 +1,42 @@
+name: Flutter Dev Intelligence CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  analyze-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install Dependencies
+        run: |
+          flutter pub get
+          cd example && flutter pub get
+
+      - name: Format Check
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Package Static Analysis
+        run: flutter analyze
+
+      - name: Example App Static Analysis
+        run: flutter analyze example
+
+      - name: Run Package Unit Tests
+        run: flutter test --timeout 2m --reporter expanded
+
+      - name: Run Example App Tests
+        run: flutter test example
+
+      - name: Validate Pub Package
+        run: dart pub publish --dry-run

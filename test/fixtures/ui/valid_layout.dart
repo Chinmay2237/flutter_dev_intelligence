@@ -1,9 +1,24 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
-Widget buildValid() {
-  return SizedBox(
-    width: 320,
-    height: 240,
-    child: ListView(children: <Widget>[const Text('content')]),
-  );
+class ValidLayoutWidget extends StatelessWidget {
+  const ValidLayoutWidget({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Valid Layout')),
+      body: Column(
+        children: [
+          const Text('Header'),
+          Expanded(
+            child: ListView.builder(
+              itemCount: 20,
+              itemBuilder: (context, index) =>
+                  ListTile(title: Text('Item $index')),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

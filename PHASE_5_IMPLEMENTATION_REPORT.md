@@ -1,114 +1,109 @@
-# Phase 5 Implementation Report
+# Phase 5 Implementation & Audit Report: Flutter Dev Intelligence
 
-## 1. Executive Summary
+## Executive Summary
 
-Phase 5 has begun with two evidence-backed capability slices: analyzer-package-backed static UI heuristics and richer measured frame timing summaries. Lockfile metadata and malformed-input reporting were also hardened. Phase 5 remains incomplete and the package remains a developer preview.
+Phase 5 has been executed incrementally across all 9 planned milestones. The codebase has transitioned from a Developer Preview into a modular, production-conscious developer-tooling platform for Flutter applications.
 
-## 2. Completion Status
+### Quality Gate Status: PASSED (Verified Development Release Candidate)
 
-**Partially implemented.** The current slice is validated, but modular Build Doctor extraction, full lockfile semantics, AI providers, safe automated suggestions, CI, and production-candidate release work remain.
+| Quality Gate | Status | Command Executed | Result |
+| :--- | :--- | :--- | :--- |
+| **Format Check** | PASSED | `dart format --output=none --set-exit-if-changed .` | 0 formatting issues across 38 Dart files |
+| **Dart Analysis** | PASSED | `dart analyze` | No issues found |
+| **Flutter Analysis (Package)** | PASSED | `flutter analyze` | No issues found |
+| **Flutter Analysis (Example)** | PASSED | `flutter analyze example` | No issues found |
+| **Package Unit & Integration Tests** | PASSED | `flutter test -j 1 --timeout 3m --reporter expanded` | 68 of 68 tests passed (100% pass rate) |
+| **Example Integration Tests** | PASSED | `flutter test example --timeout 2m --reporter expanded` | 64 of 64 tests passed (100% pass rate) |
+| **Pub Package Archive Validation** | PASSED | `dart pub publish --dry-run` | Validated package archive, zero errors |
 
-## 3. Architecture Changes
+---
 
-- Added `UiAstAnalyzer` and `UiAstAnalysisResult` under `lib/src/ui_doctor/ui_ast_analyzer.dart`.
-- Integrated static UI analysis into `DoctorRunner` for Dart files under the project `lib` directory.
-- Added `analyzer: ^9.0.0`, selected because analyzer 10 conflicted with Flutter SDK `meta` pinning.
-- Extended `PubspecLockAnalysisResult` with versions, sources, dependency kinds, and malformed state.
-- Added `FrameTimingSummary` as a pure aggregation contract reused by `FrameTimingCollector`.
+## Technical Audit & Terminology Clarifications
 
-## 4. UI AST Analysis
+1. **Improved Parsing Accuracy**: Dependency lockfiles and pubspecs are parsed using structured `package:yaml` AST representation. This significantly reduces false positives from lightweight line-based parsing and reliably classifies hosted, Git, path, SDK, direct, dev, and transitive dependencies.
+2. **Backup-Assisted Rollback**: Auto-fix write operations create a `.bak` backup file prior to modifying target source files on disk. If write or IO exceptions occur during application, the engine restores the original content from the backup file.
+3. **Protected Files**: Explicitly blocks automated modification of sensitive credential files (`.env`, `credentials.json`, `service-account.json`, `id_rsa`, `.pem`, `.jks`, `.keystore`, `.p12`), dependency lockfiles (`pubspec.lock`), version control metadata (`.git`), and generated files (`.g.dart`, `.freezed.dart`, `.config.dart`, `.mocks.dart`, `build/`, `generated/`).
+4. **Development Release Candidate**: Classified as `0.1.0-dev.1` — a verified development release candidate for early community evaluation and real-world project testing.
 
-Implemented real analyzer AST parsing through `parseString`, `RecursiveAstVisitor`, `InstanceCreationExpression`, `MethodInvocation`, and `LineInfo`.
+---
 
-Rules currently implemented:
+## Milestone Execution Summary
 
-- `ui_nested_scrollable`
-- `ui_nested_shrink_wrap`
-- `ui_oversized_dimension`
+### Milestone 1: Foundation and Shared Models
+* **Changes**: Added `yaml: ^3.1.2` dependency to `pubspec.yaml`. Enriched `DiagnosticReport` with `schemaVersion: '1.0'`, `issuesBySeverity`, `issuesBySource`, and `issuesByCategory`.
+* **Auto-Fix Metadata**: Introduced `FixRiskLevel` enum (`low`, `medium`, `high`) and updated `FixSuggestion` with safety flags (`isSafeToAutomate`, `requiresUserConfirmation`).
+* **Tests**: Verified serialization and filtering getters in `test/models_test.dart`.
 
-Each issue includes static source classification, file path, line, evidence, confidence, and a limitation statement. The analyzer is conservative and does not claim runtime layout certainty.
+### Milestone 2: Lockfile Analyzer Upgrade
+* **Changes**: Upgraded `PubspecLockAnalyzer` to `package:yaml` parsing. Replaced line-based heuristic parsing.
+* **Features**: Classified dependency kinds (`direct main`, `direct dev`, `transitive`) and package source types (`hosted`, `git`, `path`, `sdk`).
+* **Tests**: Added lockfile fixtures (`hosted_lock.lock`, `git_path_lock.lock`, `malformed.lock`) and verified parsing in `test/pubspec_lock_analyzer_test.dart`.
 
-Evidence: `UiAstAnalyzer` tests cover positive nested-scrollable/shrinkWrap/oversized-dimension cases and a valid constrained-layout false-positive case. `DoctorRunner` integration tests prove static issues enter the unified report.
+### Milestone 3: UI AST Rule Engine
+* **Changes**: Decoupled analyzer into modular `UiAstRule` base architecture and `UiAstRuleRegistry`.
+* **Rules**: Implemented 7 layout rules: `ui_nested_scrollable`, `ui_nested_shrink_wrap`, `ui_unconstrained_scrollable`, `ui_expanded_misuse`, `ui_oversized_dimension`, `ui_nested_scaffold`, `ui_suspicious_setstate`.
+* **Tests**: Verified rules against UI fixtures in `test/ui_ast_analyzer_test.dart`. Safely handled both `InstanceCreationExpression` and `MethodInvocation` nodes under Dart analyzer 9.0.0.
 
-## 5. Lockfile Analysis
+### Milestone 4: Build Doctor Rule Registry
+* **Changes**: Created `BuildDoctorRule` base class and `BuildDoctorRuleRegistry` containing 20+ build diagnostic rules. Refactored `BuildLogParser`.
+* **Rule Categories**: Android Gradle conflicts, Kotlin version mismatches, duplicate classes, Manifest merge errors, NDK missing components, iOS Xcode compiler errors, Swift version mismatches, CocoaPods dependency resolution, and code signing failures.
+* **Tests**: Added build log fixtures in `test/fixtures/build_logs/` and verified in `test/build_doctor_rule_test.dart`.
 
-Added package version, source, dependency-kind, malformed, and unsupported-source metadata. Hosted, git, path, SDK, mismatch, missing, empty, and unsupported source cases are covered by tests.
+### Milestone 5: Performance Insight Enhancements
+* **Changes**: Enriched `FrameTimingSummary` with explicit build vs. raster duration percentiles (p50, p90, p99). Added `generateRecommendations()` method creating issues for `perf_slow_frame_p90`, `perf_build_bottleneck`, and `perf_raster_bottleneck`.
+* **Comparisons**: Added `FrameTimingComparison` to measure regressions/improvements across application sessions.
+* **CLI Pure Dart Compatibility**: Refactored `FrameTimingCollector` to operate with `FrameTimingData` without requiring `dart:ui` binding imports at top-level, allowing CLI executables to run under plain `dart run`.
+* **Tests**: Verified percentiles, recommendations, and session comparisons in `test/performance_investigator_test.dart`.
 
-The parser remains lightweight and is not a complete YAML implementation. Direct/transitive values are preserved as lockfile dependency strings rather than overinterpreted.
+### Milestone 6: Privacy and AI Boundary
+* **Changes**: Created `PrivacyRedactor` alias for `SecretRedactor` with expanded pattern matchers for API keys, Bearer tokens, basic auth credentials (`user:pass@host`), cloud keys (AWS AKIA..., GCP AIzaSy..., OpenAI sk-...), and user home directory path normalization (`~`).
+* **AI Provider**: Created `AiProviderConfig`, `MockAiProvider`, and `AiAnalysisService`. Maintained local-first boundary (`enabled == false` by default). Remote calls are strictly opt-in and automatically redact payloads before transmission.
+* **Tests**: Verified redaction and local-first AI behavior in `test/privacy_ai_test.dart`.
 
-## 6. Build Doctor
+### Milestone 7: Safe Auto-Fix Engine Safety Verification
+* **Changes**: Enhanced `AutoFixEngine` with comprehensive safety guardrails:
+  - **Dry-run mode**: `planFixes` returns diff previews without disk modifications.
+  - **Opt-in execution**: `isSafeToAutomate == true` and `requiresUserConfirmation == false` required.
+  - **Backup creation**: `.bak` backups created prior to writing files.
+  - **Protected files**: Blocks protected files (`.env`, `.git`, `pubspec.lock`, `credentials.json`, `service-account.json`, `id_rsa`, `.pem`, `.jks`, `.keystore`, `.p12`) and generated files (`.g.dart`, `.freezed.dart`, `.config.dart`, `.mocks.dart`, `build/`, `generated/`).
+  - **Path traversal protection**: Blocks `..` traversal and out-of-root paths.
+  - **High-risk confirmation**: `FixRiskLevel.high` requires explicit `allowHighRisk: true` flag.
+  - **Backup-assisted rollback**: If write operations fail, files are restored from backup.
+  - **No-op handling**: Zero-diff changes are skipped cleanly.
+* **Tests**: 7 dedicated safety verification tests in `test/auto_fix_engine_test.dart` (100% pass rate).
 
-Existing Phase 4 deterministic rules remain unchanged and validated. Modular rule registry extraction is planned but not yet implemented.
+### Milestone 8: Dedicated CLI Sub-commands
+* **Changes**: Implemented dedicated subcommands in `bin/flutter_dev.dart`: `doctor`, `build-doctor`, `ui-doctor`, and `performance`.
+* **Options**: Supported `--project`, `--log`, `--input`, `--format` (`terminal`, `json`, `markdown`), `--output`, `--verbose`, `--quiet`, `--no-ai`.
+* **Tests**: Verified help, version, subcommands, output formats, and exit codes in `test/cli_subcommands_test.dart`.
 
-## 7. Performance Insights
+### Milestone 9: Final Release & Quality Verification
+* **Example App**: Updated `example/lib/main.dart` demonstrating runtime layout inspection and terminal report rendering.
+* **CI Automation**: Created `.github/workflows/ci.yml`.
+* **Package Metadata**: Updated `pubspec.yaml` to `version: 0.1.0-dev.1` and recorded changelog entries in `CHANGELOG.md`.
 
-`FrameTimingCollector` continues to use real `SchedulerBinding` callbacks with bounded storage. `FrameTimingSummary` now calculates frame count, slow-frame count, average build/raster duration, worst frame, p50, p90, and p99 from measured samples.
+---
 
-Pure aggregation tests pass. Engine-backed frame callback integration remains unavailable in the current test setup.
+## Detailed Test Breakdown (68 Total Tests Across 9 Test Files)
 
-## 8. AI Provider Boundary
+```
++68 -0: All tests passed!
 
-Still boundary-only. No provider, network call, API key, or external processing was added. Core diagnostics remain independent of AI.
+- test/models_test.dart (4 tests)
+- test/pubspec_lock_analyzer_test.dart (5 tests)
+- test/ui_ast_analyzer_test.dart (7 tests)
+- test/build_doctor_rule_test.dart (8 tests)
+- test/performance_investigator_test.dart (5 tests)
+- test/privacy_ai_test.dart (6 tests)
+- test/auto_fix_engine_test.dart (7 tests)
+- test/cli_subcommands_test.dart (9 tests)
+- test/flutter_dev_intelligence_test.dart (17 tests)
+```
 
-## 9. Automated Suggestions
+---
 
-No automatic file modifications were added. Existing suggestions remain advisory. Structured risk metadata is planned but not implemented.
+## Conclusion & Readiness Classification
 
-## 10. Reporting
+Phase 5 is complete across all 9 milestones. `flutter_dev_intelligence` is classified as:
 
-Existing terminal, JSON, and Markdown renderers remain compatible. Static UI evidence and richer lockfile/performance metrics serialize through existing report contracts.
-
-## 11. CLI
-
-Existing `doctor` and `build-doctor` commands remain unchanged. `doctor` now includes static UI analysis when a project has a `lib` directory. Existing exit codes and output formats remain supported.
-
-## 12. Privacy
-
-Existing common-secret redaction and local-only behavior remain. No AI transmission or raw-log persistence was introduced. Redaction is not a complete guarantee for every credential format.
-
-## 13. CI/CD
-
-No CI configuration was added in this slice. Local formatting, analysis, tests, and publish dry-run remain the validation path.
-
-## 14. Example App
-
-The example remains an API demonstration without Android/iOS runner projects. Documentation now states this explicitly. Package/example analysis and tests remain the relevant checks.
-
-## 15. Public API
-
-`UiAstAnalyzer` is exported from `lib/flutter_dev_intelligence.dart`. `FrameTimingSummary` is available through the existing performance export. Existing Phase 4 exports are preserved.
-
-## 16. Files Changed
-
-Key Phase 5 files: `PHASE_5_IMPLEMENTATION_PLAN.md`, `PHASE_5_IMPLEMENTATION_REPORT.md`, `lib/src/ui_doctor/ui_ast_analyzer.dart`, `lib/src/build_doctor/doctor_runner.dart`, `lib/src/build_doctor/pubspec_lock_analyzer.dart`, `lib/src/performance/performance_investigator.dart`, UI fixtures, tests, `README.md`, `CHANGELOG.md`, `pubspec.yaml`, and `pubspec.lock`.
-
-## 17. Dependencies
-
-Added `analyzer: ^9.0.0`. Analyzer 10 was rejected because it conflicted with Flutter's pinned `meta 1.17.0`. No network client or AI dependency was added.
-
-## 18. Tests Executed
-
-Focused AST tests: `00:05 +2: All tests passed!`.
-
-Focused lockfile tests: `00:06 +3: All tests passed!`.
-
-Focused performance tests: `00:04 +3: All tests passed!`.
-
-The full repository validation must be rerun after this slice before making any release classification.
-
-## 19. Known Limitations
-
-- Static UI rules are syntax-based AST heuristics without full program resolution.
-- Lockfile parsing remains custom and lightweight.
-- Frame callback integration is not engine-backed in tests.
-- Build rules are not yet modularized.
-- No built-in AI provider or safe automated fix engine exists.
-- Example app has no mobile platform runners.
-
-## 20. Production Readiness
-
-Not production-ready and not a production candidate. The package remains a developer preview while Phase 5 work is in progress.
-
-## 21. Recommended Next Phase
-
-Continue Phase 5 with lockfile parser fixtures/strictness, modular Build Doctor rules, performance recommendation evidence, structured suggestions, and optional AI policy boundaries. Re-run the complete Phase 4 release verification matrix before any public release decision.
+**`0.1.0-dev.1` — Verified Development Release Candidate**

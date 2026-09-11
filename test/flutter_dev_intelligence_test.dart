@@ -243,7 +243,7 @@ packages:
       expect(result.gitPackageCount, greaterThanOrEqualTo(1));
       expect(result.packageVersions['cupertino_icons'], '1.0.0');
       expect(result.packageSources['my_plugin'], 'git');
-      expect(result.dependencyKinds['my_plugin'], '"direct main"');
+      expect(result.dependencyKinds['my_plugin'], 'direct main');
       expect(result.malformed, isFalse);
       await dir.delete(recursive: true);
     });
@@ -604,7 +604,10 @@ Widget buildWidget() => ListView(
         result.issues.map((issue) => issue.id),
         contains('ui_oversized_dimension'),
       );
-      expect(result.issues.every((issue) => issue.source == 'static'), isTrue);
+      expect(
+        result.issues.every((issue) => issue.source.startsWith('static')),
+        isTrue,
+      );
       expect(result.issues.every((issue) => issue.line != null), isTrue);
     });
 

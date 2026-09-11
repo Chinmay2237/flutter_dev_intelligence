@@ -1,0 +1,25 @@
+# Git and path dependencies example lockfile
+packages:
+  my_git_package:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: main
+      resolved-ref: "abc123def"
+      url: "https://github.com/example/my_git_package.git"
+    source: git
+    version: "1.2.0"
+  local_utils:
+    dependency: "direct main"
+    description:
+      path: "../local_utils"
+      relative: true
+    source: path
+    version: "0.5.0"
+  flutter:
+    dependency: "direct main"
+    description: flutter
+    source: sdk
+    version: "0.0.0"
+sdks:
+  dart: ">=3.0.0"

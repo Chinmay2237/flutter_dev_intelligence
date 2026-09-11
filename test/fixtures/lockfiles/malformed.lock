@@ -1,0 +1,6 @@
+# Malformed YAML lockfile syntax
+packages:
+  broken_package:
+    dependency: direct main
+    source: [invalid yaml sequence instead of scalar string
+    version: {unclosed brace

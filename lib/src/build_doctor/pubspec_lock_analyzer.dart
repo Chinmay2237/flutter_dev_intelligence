@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:yaml/yaml.dart';
 
 /// Result of analyzing a `pubspec.lock` file.
 class PubspecLockAnalysisResult {
@@ -16,6 +17,9 @@ class PubspecLockAnalysisResult {
     required this.packageSources,
     required this.dependencyKinds,
     required this.malformed,
+    this.directMainCount = 0,
+    this.directDevCount = 0,
+    this.transitiveCount = 0,
   });
 
   final bool exists;
@@ -31,6 +35,9 @@ class PubspecLockAnalysisResult {
   final Map<String, String> packageSources;
   final Map<String, String> dependencyKinds;
   final bool malformed;
+  final int directMainCount;
+  final int directDevCount;
+  final int transitiveCount;
 
   Map<String, dynamic> toJson() => {
     'exists': exists,
@@ -46,10 +53,13 @@ class PubspecLockAnalysisResult {
     'packageSources': packageSources,
     'dependencyKinds': dependencyKinds,
     'malformed': malformed,
+    'directMainCount': directMainCount,
+    'directDevCount': directDevCount,
+    'transitiveCount': transitiveCount,
   };
 }
 
-/// Safely inspects a `pubspec.lock` file and summarises dependency sources.
+/// Safely inspects a `pubspec.lock` file using YAML parsing and summarizes dependency sources.
 class PubspecLockAnalyzer {
   const PubspecLockAnalyzer();
 
@@ -70,8 +80,8 @@ class PubspecLockAnalyzer {
         gitPackageCount: 0,
         pathPackageCount: 0,
         sdkPackageCount: 0,
-        packages: <String>[],
-        warnings: <String>['pubspec.lock is missing.'],
+        packages: const <String>[],
+        warnings: const <String>['pubspec.lock is missing.'],
         missingExpectedPackages: expectedPackages.toList(growable: false),
         packageVersions: const <String, String>{},
         packageSources: const <String, String>{},
@@ -81,61 +91,116 @@ class PubspecLockAnalyzer {
     }
 
     final text = await file.readAsString();
-    final lines = text.split(RegExp(r'\r?\n'));
+    if (text.trim().isEmpty) {
+      return PubspecLockAnalysisResult(
+        exists: true,
+        packageCount: 0,
+        hostedPackageCount: 0,
+        gitPackageCount: 0,
+        pathPackageCount: 0,
+        sdkPackageCount: 0,
+        packages: const <String>[],
+        warnings: const <String>['pubspec.lock is empty.'],
+        missingExpectedPackages: expectedPackages.toList(growable: false),
+        packageVersions: const <String, String>{},
+        packageSources: const <String, String>{},
+        dependencyKinds: const <String, String>{},
+        malformed: true,
+      );
+    }
+
+    YamlMap yamlMap;
+    try {
+      final doc = loadYaml(text);
+      if (doc is! YamlMap) {
+        return PubspecLockAnalysisResult(
+          exists: true,
+          packageCount: 0,
+          hostedPackageCount: 0,
+          gitPackageCount: 0,
+          pathPackageCount: 0,
+          sdkPackageCount: 0,
+          packages: const <String>[],
+          warnings: const <String>['pubspec.lock is not a valid YAML map.'],
+          missingExpectedPackages: expectedPackages.toList(growable: false),
+          packageVersions: const <String, String>{},
+          packageSources: const <String, String>{},
+          dependencyKinds: const <String, String>{},
+          malformed: true,
+        );
+      }
+      yamlMap = doc;
+    } catch (e) {
+      return PubspecLockAnalysisResult(
+        exists: true,
+        packageCount: 0,
+        hostedPackageCount: 0,
+        gitPackageCount: 0,
+        pathPackageCount: 0,
+        sdkPackageCount: 0,
+        packages: const <String>[],
+        warnings: <String>['Failed to parse pubspec.lock YAML: $e'],
+        missingExpectedPackages: expectedPackages.toList(growable: false),
+        packageVersions: const <String, String>{},
+        packageSources: const <String, String>{},
+        dependencyKinds: const <String, String>{},
+        malformed: true,
+      );
+    }
+
+    final packagesObj = yamlMap['packages'];
+    if (packagesObj is! YamlMap) {
+      return PubspecLockAnalysisResult(
+        exists: true,
+        packageCount: 0,
+        hostedPackageCount: 0,
+        gitPackageCount: 0,
+        pathPackageCount: 0,
+        sdkPackageCount: 0,
+        packages: const <String>[],
+        warnings: const <String>[
+          'No lockfile package entries could be parsed.',
+        ],
+        missingExpectedPackages: expectedPackages.toList(growable: false),
+        packageVersions: const <String, String>{},
+        packageSources: const <String, String>{},
+        dependencyKinds: const <String, String>{},
+        malformed: true,
+      );
+    }
 
     final packages = <String>[];
     var hosted = 0;
     var git = 0;
     var pathPackages = 0;
     var sdk = 0;
+    var directMain = 0;
+    var directDev = 0;
+    var transitive = 0;
     final warnings = <String>[];
     final packageVersions = <String, String>{};
     final packageSources = <String, String>{};
     final dependencyKinds = <String, String>{};
     var malformed = false;
 
-    String? currentPackage;
-    bool inPackagesSection = false;
+    for (final entry in packagesObj.entries) {
+      final packageName = entry.key.toString();
+      if (packageName == 'sdks') continue;
 
-    for (final rawLine in lines) {
-      final trimmed = rawLine.trim();
-      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+      packages.add(packageName);
+      final details = entry.value;
+      if (details is! YamlMap) {
+        malformed = true;
+        warnings.add('Package entry $packageName is not a map.');
         continue;
       }
 
-      if (trimmed == 'packages:') {
-        inPackagesSection = true;
-        continue;
-      }
+      final source = details['source']?.toString();
+      final version = details['version']?.toString();
+      final dependency = details['dependency']?.toString();
 
-      if (!inPackagesSection) {
-        continue;
-      }
-
-      final packageMatch = RegExp(
-        r'^([A-Za-z0-9_.-]+):\s*$',
-      ).firstMatch(trimmed);
-      if (packageMatch != null) {
-        currentPackage = packageMatch.group(1);
-        if (currentPackage != null && currentPackage != 'sdks') {
-          packages.add(currentPackage);
-        }
-        continue;
-      }
-
-      if (currentPackage == null) {
-        continue;
-      }
-
-      if (trimmed.startsWith('source:')) {
-        final source = trimmed.split(':').skip(1).join(':').trim();
-        if (!['hosted', 'git', 'path', 'sdk'].contains(source)) {
-          malformed = true;
-          warnings.add(
-            'Unsupported lockfile source "$source" for $currentPackage.',
-          );
-        }
-        packageSources[currentPackage] = source;
+      if (source != null) {
+        packageSources[packageName] = source;
         switch (source) {
           case 'sdk':
             sdk += 1;
@@ -150,17 +215,36 @@ class PubspecLockAnalyzer {
             hosted += 1;
             break;
           default:
+            malformed = true;
+            warnings.add(
+              'Unsupported lockfile source "$source" for $packageName.',
+            );
             break;
         }
-      } else if (trimmed.startsWith('version:')) {
-        final version = trimmed.substring('version:'.length).trim();
-        packageVersions[currentPackage] = version
+      } else {
+        malformed = true;
+        warnings.add('Lockfile package entry $packageName has no source.');
+      }
+
+      if (version != null) {
+        packageVersions[packageName] = version
             .replaceAll('"', '')
             .replaceAll("'", '');
-      } else if (trimmed.startsWith('dependency:')) {
-        dependencyKinds[currentPackage] = trimmed
-            .substring('dependency:'.length)
+      }
+
+      if (dependency != null) {
+        final cleanDependency = dependency
+            .replaceAll('"', '')
+            .replaceAll("'", '')
             .trim();
+        dependencyKinds[packageName] = cleanDependency;
+        if (cleanDependency.contains('direct main')) {
+          directMain += 1;
+        } else if (cleanDependency.contains('direct dev')) {
+          directDev += 1;
+        } else if (cleanDependency.contains('transitive')) {
+          transitive += 1;
+        }
       }
     }
 
@@ -168,15 +252,7 @@ class PubspecLockAnalyzer {
       warnings.add('No lockfile package entries could be parsed.');
       malformed = true;
     }
-    final packagesWithoutSources = packages
-        .where((package) => !packageSources.containsKey(package))
-        .toList(growable: false);
-    if (packagesWithoutSources.isNotEmpty) {
-      malformed = true;
-      warnings.add(
-        'Lockfile package entries without a source: ${packagesWithoutSources.join(', ')}.',
-      );
-    }
+
     final missingExpectedPackages = expectedPackages
         .where((package) => !packages.contains(package))
         .toList(growable: false);
@@ -201,6 +277,9 @@ class PubspecLockAnalyzer {
       packageSources: packageSources,
       dependencyKinds: dependencyKinds,
       malformed: malformed,
+      directMainCount: directMain,
+      directDevCount: directDev,
+      transitiveCount: transitive,
     );
   }
 }

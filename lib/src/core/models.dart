@@ -74,19 +74,47 @@ class EvidenceReference {
   }
 }
 
-/// Concrete suggestion to fix an issue without modifying files automatically.
+/// Risk levels for proposed automated or manual fixes.
+enum FixRiskLevel { low, medium, high }
+
+/// Concrete suggestion to fix an issue with risk and automation metadata.
 class FixSuggestion {
   final String action;
   final String details;
+  final FixRiskLevel riskLevel;
+  final String? proposedChange;
+  final bool isSafeToAutomate;
+  final bool requiresUserConfirmation;
 
-  const FixSuggestion({required this.action, required this.details});
+  const FixSuggestion({
+    required this.action,
+    required this.details,
+    this.riskLevel = FixRiskLevel.low,
+    this.proposedChange,
+    this.isSafeToAutomate = false,
+    this.requiresUserConfirmation = true,
+  });
 
-  Map<String, dynamic> toJson() => {'action': action, 'details': details};
+  Map<String, dynamic> toJson() => {
+    'action': action,
+    'details': details,
+    'riskLevel': riskLevel.name,
+    'proposedChange': proposedChange,
+    'isSafeToAutomate': isSafeToAutomate,
+    'requiresUserConfirmation': requiresUserConfirmation,
+  };
 
   factory FixSuggestion.fromJson(Map<String, dynamic> json) {
     return FixSuggestion(
       action: json['action'] as String? ?? 'Review the issue',
       details: json['details'] as String? ?? '',
+      riskLevel: FixRiskLevel.values.byName(
+        json['riskLevel'] as String? ?? 'low',
+      ),
+      proposedChange: json['proposedChange'] as String?,
+      isSafeToAutomate: json['isSafeToAutomate'] as bool? ?? false,
+      requiresUserConfirmation:
+          json['requiresUserConfirmation'] as bool? ?? true,
     );
   }
 }
@@ -204,6 +232,7 @@ class DiagnosticReport {
   final List<String> warnings;
   final String toolName;
   final String toolVersion;
+  final String schemaVersion;
   final String? projectPath;
   final List<String> analyzedSources;
   final List<String> limitations;
@@ -220,6 +249,7 @@ class DiagnosticReport {
     this.warnings = const <String>[],
     this.toolName = 'flutter_dev_intelligence',
     this.toolVersion = '0.0.1',
+    this.schemaVersion = '1.0',
     this.projectPath,
     this.analyzedSources = const <String>[],
     this.limitations = const <String>[],
@@ -236,6 +266,30 @@ class DiagnosticReport {
     return counts;
   }
 
+  Map<DiagnosticSeverity, List<DiagnosticIssue>> get issuesBySeverity {
+    final grouped = <DiagnosticSeverity, List<DiagnosticIssue>>{};
+    for (final issue in issues) {
+      grouped.putIfAbsent(issue.severity, () => <DiagnosticIssue>[]).add(issue);
+    }
+    return grouped;
+  }
+
+  Map<String, List<DiagnosticIssue>> get issuesBySource {
+    final grouped = <String, List<DiagnosticIssue>>{};
+    for (final issue in issues) {
+      grouped.putIfAbsent(issue.source, () => <DiagnosticIssue>[]).add(issue);
+    }
+    return grouped;
+  }
+
+  Map<DiagnosticCategory, List<DiagnosticIssue>> get issuesByCategory {
+    final grouped = <DiagnosticCategory, List<DiagnosticIssue>>{};
+    for (final issue in issues) {
+      grouped.putIfAbsent(issue.category, () => <DiagnosticIssue>[]).add(issue);
+    }
+    return grouped;
+  }
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'createdAt': createdAt.toIso8601String(),
@@ -245,6 +299,7 @@ class DiagnosticReport {
     'warnings': warnings,
     'toolName': toolName,
     'toolVersion': toolVersion,
+    'schemaVersion': schemaVersion,
     'projectPath': projectPath,
     'analyzedSources': analyzedSources,
     'limitations': limitations,
@@ -274,6 +329,7 @@ class DiagnosticReport {
           .toList(),
       toolName: json['toolName'] as String? ?? 'flutter_dev_intelligence',
       toolVersion: json['toolVersion'] as String? ?? '0.0.1',
+      schemaVersion: json['schemaVersion'] as String? ?? '1.0',
       projectPath: json['projectPath'] as String?,
       analyzedSources: ((json['analyzedSources'] as List?) ?? const [])
           .map((entry) => entry.toString())
