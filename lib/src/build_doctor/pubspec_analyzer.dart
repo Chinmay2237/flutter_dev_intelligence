@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:yaml/yaml.dart';
 
 /// Structured summary of a project's `pubspec.yaml`.
 class PubspecAnalysisResult {
@@ -53,129 +54,92 @@ class PubspecAnalyzer {
     }
 
     final raw = await file.readAsString();
-    final lines = raw.split(RegExp(r'\r?\n'));
-
-    var packageName = '';
-    var description = '';
-    var version = '';
-    var isFlutterProject = false;
-    final dependencies = <String>[];
-    final devDependencies = <String>[];
-    final sdkConstraints = <String>[];
-
-    var inDependencies = false;
-    var inDevDependencies = false;
-    var inEnvironment = false;
-
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty || trimmed.startsWith('#')) {
-        continue;
-      }
-
-      final isTopLevel = line.trimLeft().length == line.length;
-      if (isTopLevel && trimmed.endsWith(':')) {
-        if (trimmed == 'dependencies:') {
-          inDependencies = true;
-          inDevDependencies = false;
-          inEnvironment = false;
-        } else if (trimmed == 'dev_dependencies:') {
-          inDevDependencies = true;
-          inDependencies = false;
-          inEnvironment = false;
-        } else if (trimmed == 'environment:') {
-          inEnvironment = true;
-          inDependencies = false;
-          inDevDependencies = false;
-        } else if (trimmed == 'flutter:') {
-          isFlutterProject = true;
-          inDependencies = false;
-          inDevDependencies = false;
-          inEnvironment = false;
-        } else {
-          inDependencies = false;
-          inDevDependencies = false;
-          inEnvironment = false;
-        }
-        continue;
-      }
-
-      if (trimmed.startsWith('name:')) {
-        packageName = trimmed.substring('name:'.length).trim();
-        continue;
-      }
-
-      if (trimmed.startsWith('description:')) {
-        description = trimmed.substring('description:'.length).trim();
-        continue;
-      }
-
-      if (trimmed.startsWith('version:')) {
-        version = trimmed.substring('version:'.length).trim();
-        continue;
-      }
-
-      if (trimmed.startsWith('environment:')) {
-        inEnvironment = true;
-        continue;
-      }
-
-      if (trimmed.startsWith('dependencies:')) {
-        inDependencies = true;
-        inDevDependencies = false;
-        inEnvironment = false;
-        continue;
-      }
-
-      if (trimmed.startsWith('dev_dependencies:')) {
-        inDevDependencies = true;
-        inDependencies = false;
-        inEnvironment = false;
-        continue;
-      }
-
-      if (trimmed.startsWith('flutter:')) {
-        isFlutterProject = true;
-        if (inDependencies || inDevDependencies) {
-          continue;
-        }
-        inDependencies = false;
-        inDevDependencies = false;
-        inEnvironment = false;
-        continue;
-      }
-
-      if (inEnvironment && trimmed.contains(':')) {
-        sdkConstraints.add(trimmed.replaceAll(':', ': '));
-        continue;
-      }
-
-      if (inDependencies &&
-          !trimmed.startsWith('sdk:') &&
-          !trimmed.startsWith('flutter:') &&
-          trimmed.contains(':')) {
-        final key = trimmed.split(':').first.trim();
-        if (key.isNotEmpty) {
-          dependencies.add(key);
-        }
-      }
-
-      if (inDevDependencies && trimmed.contains(':')) {
-        final key = trimmed.split(':').first.trim();
-        if (key.isNotEmpty) {
-          devDependencies.add(key);
-        }
-      }
+    if (raw.trim().isEmpty) {
+      return const PubspecAnalysisResult(
+        packageName: '',
+        description: '',
+        version: '',
+        isFlutterProject: false,
+        dependencies: <String>[],
+        devDependencies: <String>[],
+        sdkConstraints: <String>[],
+      );
     }
 
-    return PubspecAnalysisResult(
-      packageName: packageName,
-      description: description,
-      version: version,
-      isFlutterProject: isFlutterProject,
-      dependencies: dependencies,
-      devDependencies: devDependencies,
-      sdkConstraints: sdkConstraints,
-    );
+    try {
+      final doc = loadYaml(raw);
+      if (doc is! YamlMap) {
+        return const PubspecAnalysisResult(
+          packageName: '',
+          description: '',
+          version: '',
+          isFlutterProject: false,
+          dependencies: <String>[],
+          devDependencies: <String>[],
+          sdkConstraints: <String>[],
+        );
+      }
+
+      final packageName = doc['name']?.toString().trim() ?? '';
+      final description = doc['description']?.toString().trim() ?? '';
+      final version = doc['version']?.toString().trim() ?? '';
+
+      final depsObj = doc['dependencies'];
+      final devDepsObj = doc['dev_dependencies'];
+      final envObj = doc['environment'];
+
+      final isFlutterProject =
+          doc.containsKey('flutter') ||
+          (depsObj is YamlMap && depsObj.containsKey('flutter'));
+
+      final dependencies = <String>[];
+      if (depsObj is YamlMap) {
+        for (final key in depsObj.keys) {
+          final name = key.toString().trim();
+          if (name.isNotEmpty) {
+            dependencies.add(name);
+          }
+        }
+      }
+
+      final devDependencies = <String>[];
+      if (devDepsObj is YamlMap) {
+        for (final key in devDepsObj.keys) {
+          final name = key.toString().trim();
+          if (name.isNotEmpty) {
+            devDependencies.add(name);
+          }
+        }
+      }
+
+      final sdkConstraints = <String>[];
+      if (envObj is YamlMap) {
+        for (final entry in envObj.entries) {
+          final k = entry.key.toString().trim();
+          final v = entry.value.toString().trim();
+          sdkConstraints.add('$k: $v');
+        }
+      }
+
+      return PubspecAnalysisResult(
+        packageName: packageName,
+        description: description,
+        version: version,
+        isFlutterProject: isFlutterProject,
+        dependencies: dependencies,
+        devDependencies: devDependencies,
+        sdkConstraints: sdkConstraints,
+      );
+    } catch (_) {
+      return const PubspecAnalysisResult(
+        packageName: '',
+        description: '',
+        version: '',
+        isFlutterProject: false,
+        dependencies: <String>[],
+        devDependencies: <String>[],
+        sdkConstraints: <String>[],
+      );
+    }
   }
 }

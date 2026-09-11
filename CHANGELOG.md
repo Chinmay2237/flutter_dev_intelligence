@@ -1,3 +1,23 @@
+## 0.1.0-dev.2
+
+### Lockfile & Dependency Analyzer Fixes
+* Refactored `PubspecAnalyzer` to use `loadYaml` for authoritative dependency map parsing.
+* Fixed false-positive `Dependencies declared in pubspec.yaml but absent from pubspec.lock: sdk` by excluding SDK pseudo-packages (`sdk`, `flutter`, `sky_engine`) and environment constraints.
+
+### Static UI Diagnostic Engine Improvements
+* Refined `UiSuspiciousSetStateRule` with AST parent traversal to distinguish direct build-time `setState()` calls from callback/closure invocations (`onTap`, `onPressed`, event handlers, async callbacks).
+* Enhanced `UiNestedScrollableRule` with contextual checks for `NeverScrollableScrollPhysics`, horizontal carousels (`scrollDirection: Axis.horizontal`), Slivers inside `CustomScrollView`, and bounded parent containers (`SizedBox`, `Expanded`, `Flexible`).
+
+### CLI Architecture & Pipe / Stdin Support
+* Added `--stdin` support for `build-doctor` and `performance` commands to enable stdin pipe workflows (`flutter analyze 2>&1 | dart run ...` and `cat trace.json | dart run ...`).
+* Enforced option validation (rejecting `--stdin` combined with `--log` or `--input`), non-empty stdin validation, and actionable error messages with clean exit codes (0 for success, 1 for issues found, 2 for argument/usage error, 3 for runtime error).
+
+### Terminal UX, Semantic Colors & Exporters
+* Implemented ANSI semantic color system with TTY auto-detection, `NO_COLOR` environment variable support, and `--color auto|always|never` / `--no-color` options.
+* Added ASCII symbol fallbacks (`✓`, `!`) and ANSI code stripping for saved file output (`--output <path>`).
+* Centralized package version (`kPackageVersion = '0.1.0-dev.2'`) across CLI, `DiagnosticReport` models, and metadata.
+* Upgraded Markdown exporter (`--format markdown`) and JSON exporter (`--format json`) for clean machine-readable integration without ANSI escape sequence pollution.
+
 ## 0.1.0-dev.1
 
 ### Foundation & Models

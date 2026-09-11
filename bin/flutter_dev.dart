@@ -18,7 +18,7 @@ Future<void> main(List<String> arguments) async {
 
     case '--version':
     case '-v':
-      stdout.writeln('flutter_dev_intelligence 0.1.0-dev.1');
+      stdout.writeln('flutter_dev_intelligence $kPackageVersion');
       exitCode = 0;
       return;
 
@@ -63,7 +63,9 @@ Future<int> _runDoctor(List<String> arguments) async {
   if (options.errorExitCode != null) return options.errorExitCode!;
 
   if (!await Directory(options.projectPath).exists()) {
-    stderr.writeln('Project directory not found: ${options.projectPath}');
+    stderr.writeln(
+      'Error: Project directory not found: ${options.projectPath}',
+    );
     return 2;
   }
 
@@ -71,12 +73,13 @@ Future<int> _runDoctor(List<String> arguments) async {
     final report = await DoctorRunner.run(
       DoctorOptions(projectPath: options.projectPath, logPath: options.logPath),
     );
-    return await _renderAndOutput(report, options);
+    return await _renderAndOutput(report, options, commandName: 'doctor');
   } on FileSystemException catch (error) {
-    stderr.writeln('Unable to write report: ${error.message}');
+    stderr.writeln('Error: Unable to write report: ${error.message}');
     return 3;
-  } catch (error) {
-    stderr.writeln('Diagnostic execution failed: $error');
+  } catch (error, stack) {
+    stderr.writeln('Error: Diagnostic execution failed: $error');
+    if (options.verbose) stderr.writeln(stack);
     return 3;
   }
 }
@@ -85,19 +88,39 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
   final options = _parseCommonArgs(arguments);
   if (options.errorExitCode != null) return options.errorExitCode!;
 
-  if (options.logPath == null) {
-    stderr.writeln('Build Doctor requires --log <path>.');
+  if (options.useStdin && options.logPath != null) {
+    stderr.writeln('Error: Cannot combine --stdin and --log.');
     return 2;
   }
 
-  final logFile = File(options.logPath!);
-  if (!await logFile.exists()) {
-    stderr.writeln('Build log file not found: ${options.logPath}');
+  String logContent;
+  String sourceLabel;
+
+  if (options.useStdin) {
+    logContent = await _readStdin();
+    if (logContent.trim().isEmpty) {
+      stderr.writeln('Error: Standard input (stdin) was empty.');
+      return 2;
+    }
+    sourceLabel = 'stdin';
+  } else if (options.logPath != null) {
+    final logFile = File(options.logPath!);
+    if (!await logFile.exists()) {
+      stderr.writeln('Error: Build log file not found: ${options.logPath}');
+      return 2;
+    }
+    logContent = await logFile.readAsString();
+    sourceLabel = options.logPath!;
+  } else {
+    stderr.writeln('Error: Build Doctor requires --log <path> or --stdin.');
+    stderr.writeln();
+    stderr.writeln('Usage:');
+    stderr.writeln('  flutter-dev build-doctor --log <path>');
+    stderr.writeln('  flutter-dev build-doctor --stdin');
     return 2;
   }
 
   try {
-    final logContent = await logFile.readAsString();
     final issues = BuildLogParser.parse(logContent);
 
     final report = DiagnosticReport(
@@ -106,12 +129,13 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
       projectName: 'build-log-analysis',
       projectPath: options.projectPath,
       issues: issues,
-      analyzedSources: const ['build log'],
+      analyzedSources: [sourceLabel],
     );
 
-    return await _renderAndOutput(report, options);
-  } catch (error) {
-    stderr.writeln('Build Doctor execution failed: $error');
+    return await _renderAndOutput(report, options, commandName: 'build-doctor');
+  } catch (error, stack) {
+    stderr.writeln('Error: Build Doctor execution failed: $error');
+    if (options.verbose) stderr.writeln(stack);
     return 3;
   }
 }
@@ -125,7 +149,7 @@ Future<int> _runUiDoctor(List<String> arguments) async {
   );
   if (!await libDir.exists()) {
     stderr.writeln(
-      'Lib directory not found for static UI analysis: ${libDir.path}',
+      'Error: Lib directory not found for static UI analysis: ${libDir.path}',
     );
     return 2;
   }
@@ -146,9 +170,10 @@ Future<int> _runUiDoctor(List<String> arguments) async {
       ],
     );
 
-    return await _renderAndOutput(report, options);
-  } catch (error) {
-    stderr.writeln('UI Doctor execution failed: $error');
+    return await _renderAndOutput(report, options, commandName: 'ui-doctor');
+  } catch (error, stack) {
+    stderr.writeln('Error: UI Doctor execution failed: $error');
+    if (options.verbose) stderr.writeln(stack);
     return 3;
   }
 }
@@ -157,26 +182,44 @@ Future<int> _runPerformance(List<String> arguments) async {
   final options = _parseCommonArgs(arguments);
   if (options.errorExitCode != null) return options.errorExitCode!;
 
-  String? inputPath = options.inputPath;
-  if (inputPath == null && options.logPath != null) {
-    inputPath = options.logPath;
-  }
-
-  if (inputPath == null) {
-    stderr.writeln('Performance doctor requires --input <trace.json>.');
+  final inputPath = options.inputPath ?? options.logPath;
+  if (options.useStdin && inputPath != null) {
+    stderr.writeln('Error: Cannot combine --stdin and --input.');
     return 2;
   }
 
-  final inputFile = File(inputPath);
-  if (!await inputFile.exists()) {
-    stderr.writeln('Performance trace file not found: $inputPath');
+  String jsonText;
+  String sourceLabel;
+
+  if (options.useStdin) {
+    jsonText = await _readStdin();
+    if (jsonText.trim().isEmpty) {
+      stderr.writeln('Error: Standard input (stdin) was empty.');
+      return 2;
+    }
+    sourceLabel = 'stdin';
+  } else if (inputPath != null) {
+    final inputFile = File(inputPath);
+    if (!await inputFile.exists()) {
+      stderr.writeln('Error: Performance trace file not found: $inputPath');
+      return 2;
+    }
+    jsonText = await inputFile.readAsString();
+    sourceLabel = inputPath;
+  } else {
+    stderr.writeln(
+      'Error: Performance doctor requires --input <trace.json> or --stdin.',
+    );
     return 2;
   }
 
   try {
-    final text = await inputFile.readAsString();
-    final json = jsonDecode(text) as Map<String, dynamic>;
-    final summary = FrameTimingSummary.fromJson(json);
+    final dynamic parsedJson = jsonDecode(jsonText);
+    if (parsedJson is! Map<String, dynamic>) {
+      stderr.writeln('Error: Performance trace input must be a JSON object.');
+      return 2;
+    }
+    final summary = FrameTimingSummary.fromJson(parsedJson);
     final recommendations = summary.generateRecommendations();
 
     final report = DiagnosticReport(
@@ -185,14 +228,24 @@ Future<int> _runPerformance(List<String> arguments) async {
       projectName: 'performance-analysis',
       issues: recommendations,
       metrics: summary.toJson(),
-      analyzedSources: [inputPath],
+      analyzedSources: [sourceLabel],
     );
 
-    return await _renderAndOutput(report, options);
-  } catch (error) {
-    stderr.writeln('Performance analysis execution failed: $error');
+    return await _renderAndOutput(report, options, commandName: 'performance');
+  } on FormatException catch (error) {
+    stderr.writeln(
+      'Error: Performance trace input is invalid JSON: ${error.message}',
+    );
+    return 2;
+  } catch (error, stack) {
+    stderr.writeln('Error: Performance analysis execution failed: $error');
+    if (options.verbose) stderr.writeln(stack);
     return 3;
   }
+}
+
+Future<String> _readStdin() async {
+  return await systemEncoding.decodeStream(stdin);
 }
 
 class _CliOptions {
@@ -205,6 +258,8 @@ class _CliOptions {
     this.quiet = false,
     this.verbose = false,
     this.noAi = false,
+    this.useStdin = false,
+    this.colorMode = ColorMode.auto,
     this.errorExitCode,
   });
 
@@ -216,6 +271,8 @@ class _CliOptions {
   final bool quiet;
   final bool verbose;
   final bool noAi;
+  final bool useStdin;
+  final ColorMode colorMode;
   final int? errorExitCode;
 }
 
@@ -228,6 +285,8 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
   var quiet = false;
   var verbose = false;
   var noAi = false;
+  var useStdin = false;
+  var colorMode = ColorMode.auto;
 
   for (var index = 0; index < arguments.length; index += 1) {
     final argument = arguments[index];
@@ -236,9 +295,10 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
         argument == '--log' ||
         argument == '--input' ||
         argument == '--format' ||
-        argument == '--output') {
+        argument == '--output' ||
+        argument == '--color') {
       if (index + 1 >= arguments.length) {
-        stderr.writeln('Missing value for $argument.');
+        stderr.writeln('Error: Missing value for $argument.');
         return _CliOptions(projectPath: projectPath, errorExitCode: 2);
       }
       value = arguments[++index];
@@ -260,6 +320,30 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
       case '--output':
         outputPath = value!;
         break;
+      case '--color':
+        switch (value!.toLowerCase()) {
+          case 'always':
+            colorMode = ColorMode.always;
+            break;
+          case 'never':
+            colorMode = ColorMode.never;
+            break;
+          case 'auto':
+            colorMode = ColorMode.auto;
+            break;
+          default:
+            stderr.writeln(
+              'Error: Invalid --color mode: $value. Choose auto, always, or never.',
+            );
+            return _CliOptions(projectPath: projectPath, errorExitCode: 2);
+        }
+        break;
+      case '--no-color':
+        colorMode = ColorMode.never;
+        break;
+      case '--stdin':
+        useStdin = true;
+        break;
       case '--verbose':
         verbose = true;
         break;
@@ -273,14 +357,16 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
         if (!argument.startsWith('-') && arguments.length == 1) {
           projectPath = argument;
         } else {
-          stderr.writeln('Unknown option: $argument');
+          stderr.writeln('Error: Unknown option: $argument');
           return _CliOptions(projectPath: projectPath, errorExitCode: 2);
         }
     }
   }
 
   if (!const {'terminal', 'json', 'markdown'}.contains(format)) {
-    stderr.writeln('Unsupported output format: $format');
+    stderr.writeln(
+      'Error: Unsupported output format: $format. Choose terminal, json, or markdown.',
+    );
     return _CliOptions(projectPath: projectPath, errorExitCode: 2);
   }
 
@@ -293,27 +379,39 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
     quiet: quiet,
     verbose: verbose,
     noAi: noAi,
+    useStdin: useStdin,
+    colorMode: colorMode,
   );
 }
 
 Future<int> _renderAndOutput(
   DiagnosticReport report,
-  _CliOptions options,
-) async {
+  _CliOptions options, {
+  String? commandName,
+}) async {
   final rendered = switch (options.format) {
     'json' => DiagnosticReportRenderer.renderJson(report),
     'markdown' => DiagnosticReportRenderer.renderMarkdown(report),
-    _ => DiagnosticReportRenderer.renderTerminal(report),
+    _ => DiagnosticReportRenderer.renderTerminal(
+      report,
+      colorMode: options.colorMode,
+      commandName: commandName,
+    ),
   };
 
   if (options.outputPath != null) {
     await File(options.outputPath!).parent.create(recursive: true);
-    await File(options.outputPath!).writeAsString('$rendered\n');
-  } else if (!options.quiet) {
+    // Strip ANSI codes if saving terminal report to file unless color explicitly forced
+    final fileContent =
+        (options.format == 'terminal' && options.colorMode != ColorMode.always)
+        ? DiagnosticReportRenderer.stripAnsi(rendered)
+        : rendered;
+    await File(options.outputPath!).writeAsString('$fileContent\n');
+  }
+
+  if (!options.quiet) {
     stdout.write(rendered);
-    if (!rendered.endsWith('\n')) {
-      stdout.writeln();
-    }
+    if (!rendered.endsWith('\n')) stdout.writeln();
   }
 
   if (options.verbose && !options.quiet && options.format == 'terminal') {
@@ -324,22 +422,25 @@ Future<int> _renderAndOutput(
 }
 
 void _printHelp() {
-  stdout.writeln('Flutter Dev Intelligence CLI');
+  stdout.writeln('Flutter Dev Intelligence');
+  stdout.writeln('');
+  stdout.writeln('Inspect Flutter projects, build logs, static UI patterns,');
+  stdout.writeln('and performance traces with structured diagnostics.');
   stdout.writeln('');
   stdout.writeln('Usage: flutter-dev <command> [options]');
   stdout.writeln('');
   stdout.writeln('Commands:');
   stdout.writeln(
-    '  doctor          Run complete project diagnostics (scans pubspec, lockfile, UI AST, log)',
+    '  doctor          Run project-wide diagnostics (pubspec, lockfile, static UI, logs)',
   );
   stdout.writeln(
-    '  build-doctor    Run build log diagnostic rules (--log <path> required)',
+    '  build-doctor    Analyze Flutter/Dart build logs (--log <path> or --stdin)',
   );
   stdout.writeln(
-    '  ui-doctor       Run static Dart AST UI layout heuristics (--project <path>)',
+    '  ui-doctor       Analyze static Flutter Dart AST UI layout heuristics (--project <path>)',
   );
   stdout.writeln(
-    '  performance     Analyze frame timing trace metrics (--input <trace.json>)',
+    '  performance     Analyze performance frame timing trace data (--input <trace.json> or --stdin)',
   );
   stdout.writeln('');
   stdout.writeln('Options:');
@@ -349,14 +450,41 @@ void _printHelp() {
   stdout.writeln('  --log <path>       Build log file path');
   stdout.writeln('  --input <path>     Trace / metrics JSON file path');
   stdout.writeln(
-    '  --format <name>    Output format: terminal, json, or markdown (default: terminal)',
+    '  --stdin            Read log or trace input from standard input pipe',
   );
-  stdout.writeln('  --output <path>    Write output report to file');
-  stdout.writeln('  --verbose          Print additional diagnostic details');
-  stdout.writeln('  --quiet            Suppress report stdout output');
+  stdout.writeln(
+    '  --format <format>  Output format: terminal, json, or markdown (default: terminal)',
+  );
+  stdout.writeln(
+    '  --output <path>    Write output report to specified file path',
+  );
+  stdout.writeln(
+    '  --color <mode>     Terminal color mode: auto, always, or never (default: auto)',
+  );
+  stdout.writeln(
+    '  --no-color         Disable terminal colors (same as --color never)',
+  );
   stdout.writeln(
     '  --no-ai            Disable optional AI provider enrichment',
   );
-  stdout.writeln('  --help, -h         Print this help message');
-  stdout.writeln('  --version, -v      Print package version');
+  stdout.writeln(
+    '  --verbose          Print detailed execution diagnostics and stack traces',
+  );
+  stdout.writeln('  --quiet            Suppress stdout output');
+  stdout.writeln('  --help, -h         Show this help message');
+  stdout.writeln('  --version, -v      Show package version');
+  stdout.writeln('');
+  stdout.writeln('Examples:');
+  stdout.writeln(
+    '  dart run flutter_dev_intelligence:flutter_dev doctor --project .',
+  );
+  stdout.writeln(
+    '  flutter analyze 2>&1 | dart run flutter_dev_intelligence:flutter_dev build-doctor --stdin',
+  );
+  stdout.writeln(
+    '  cat trace.json | dart run flutter_dev_intelligence:flutter_dev performance --stdin',
+  );
+  stdout.writeln(
+    '  dart run flutter_dev_intelligence:flutter_dev ui-doctor --format json --output report.json',
+  );
 }

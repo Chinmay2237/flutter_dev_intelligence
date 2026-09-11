@@ -121,19 +121,108 @@ class UiNestedScrollableRule extends UiAstRule {
     if (typeName != null &&
         _scrollableNames.contains(typeName) &&
         context.isInsideScrollable) {
+      final parentScrollable = context.scrollableStack.first;
+
+      // Check if inside CustomScrollView with Slivers
+      if (parentScrollable == 'CustomScrollView' &&
+          context.parentWidgetNames.any((w) => w.startsWith('Sliver'))) {
+        return issues;
+      }
+
+      // Check physics parameter on node (e.g. NeverScrollableScrollPhysics)
+      if (_hasNeverScrollablePhysics(node)) {
+        return issues;
+      }
+
+      // Check if horizontal scrollable inside vertical scrollable
+      if (_isHorizontalScrollDirection(node)) {
+        issues.add(
+          createIssue(
+            node,
+            context,
+            customSeverity: DiagnosticSeverity.low,
+            customConfidence: 0.6,
+            description:
+                'Horizontal $typeName is nested inside vertical $parentScrollable. '
+                'Verify gesture boundaries for horizontal scrolling within vertical list.',
+            suggestion:
+                'Ensure item touch targets and horizontal swipe gestures do not conflict with parent scroll.',
+          ),
+        );
+        return issues;
+      }
+
+      // Check if wrapped in bounded constraints (SizedBox, Container with height, Expanded, Flexible)
+      final isBounded = context.parentWidgetNames.any(
+        (name) => const {
+          'SizedBox',
+          'ConstrainedBox',
+          'Container',
+          'Expanded',
+          'Flexible',
+        }.contains(name),
+      );
+
+      final issueSeverity = isBounded
+          ? DiagnosticSeverity.low
+          : DiagnosticSeverity.medium;
+      final issueConfidence = isBounded ? 0.65 : 0.8;
+
       issues.add(
         createIssue(
           node,
           context,
+          customSeverity: issueSeverity,
+          customConfidence: issueConfidence,
           description:
-              'A $typeName is nested inside another scrollable widget (${context.scrollableStack.first}). '
-              'This can lead to scrolling conflicts and layout calculation issues.',
+              'A $typeName is nested inside another scrollable widget ($parentScrollable).'
+              '${isBounded ? " Wrapped in bounded container." : " May cause scrolling conflicts and unbounded layout errors."}',
           suggestion:
-              'Consider combining scrollable content using CustomScrollView or setting explicit parent constraints and physics.',
+              'Consider combining scrollable content using CustomScrollView with Slivers, or setting explicit physics and constraints.',
         ),
       );
     }
     return issues;
+  }
+
+  static ArgumentList? _getArgumentList(AstNode node) {
+    if (node is InstanceCreationExpression) {
+      return node.argumentList;
+    } else if (node is MethodInvocation) {
+      return node.argumentList;
+    }
+    return null;
+  }
+
+  static bool _hasNeverScrollablePhysics(AstNode node) {
+    final argumentList = _getArgumentList(node);
+    if (argumentList != null) {
+      for (final arg in argumentList.arguments) {
+        if (arg is NamedExpression && arg.name.label.name == 'physics') {
+          final src = arg.expression.toSource();
+          if (src.contains('NeverScrollableScrollPhysics')) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool _isHorizontalScrollDirection(AstNode node) {
+    final argumentList = _getArgumentList(node);
+    if (argumentList != null) {
+      for (final arg in argumentList.arguments) {
+        if (arg is NamedExpression &&
+            arg.name.label.name == 'scrollDirection') {
+          final src = arg.expression.toSource();
+          if (src.contains('Axis.horizontal') || src.contains('horizontal')) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   static const _scrollableNames = <String>{
@@ -372,20 +461,36 @@ class UiSuspiciousSetStateRule extends UiAstRule {
     final issues = <DiagnosticIssue>[];
     if (node is MethodInvocation && node.methodName.name == 'setState') {
       if (context.enclosingMethodName == 'build') {
-        issues.add(
-          createIssue(
-            node,
-            context,
-            description:
-                'setState() was invoked directly inside the widget build() method. '
-                'This causes infinite build loops and immediate runtime crashes.',
-            suggestion:
-                'Move setState() calls into event handlers (onTap, onPressed) or lifecycle hooks.',
-          ),
-        );
+        if (!_isInsideCallbackOrClosure(node)) {
+          issues.add(
+            createIssue(
+              node,
+              context,
+              description:
+                  'setState() was invoked directly inside the widget build() method. '
+                  'This causes infinite build loops and immediate runtime crashes.',
+              suggestion:
+                  'Move setState() calls into event handlers (onTap, onPressed) or lifecycle hooks.',
+            ),
+          );
+        }
       }
     }
     return issues;
+  }
+
+  static bool _isInsideCallbackOrClosure(MethodInvocation node) {
+    AstNode? parent = node.parent;
+    while (parent != null) {
+      if (parent is MethodDeclaration) {
+        return false;
+      }
+      if (parent is FunctionExpression || parent is FunctionDeclaration) {
+        return true;
+      }
+      parent = parent.parent;
+    }
+    return false;
   }
 }
 

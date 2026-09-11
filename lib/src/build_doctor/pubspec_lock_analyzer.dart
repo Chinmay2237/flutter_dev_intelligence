@@ -254,7 +254,13 @@ class PubspecLockAnalyzer {
     }
 
     final missingExpectedPackages = expectedPackages
-        .where((package) => !packages.contains(package))
+        .where(
+          (package) =>
+              package != 'sdk' &&
+              package != 'flutter' &&
+              package != 'sky_engine' &&
+              !packages.contains(package),
+        )
         .toList(growable: false);
     if (missingExpectedPackages.isNotEmpty) {
       warnings.add(

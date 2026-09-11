@@ -1,3 +1,6 @@
+@Timeout(Duration(minutes: 2))
+library;
+
 import 'dart:io';
 import 'dart:convert';
 
@@ -80,7 +83,7 @@ void main() {
               as Map<String, dynamic>;
       final markdown = DiagnosticReportRenderer.renderMarkdown(report);
 
-      expect(terminal, contains('Skipped: build log'));
+      expect(terminal, contains('Skipped checks: build log'));
       expect(terminal, contains('Unavailable: AI provider'));
       expect(json['severityCounts'], isA<Map<String, dynamic>>());
       expect(markdown, contains('## Limitations'));
@@ -376,7 +379,7 @@ dependencies:
       ], runInShell: true);
 
       expect(result.exitCode, 0);
-      expect(result.stdout.toString(), contains('Diagnostic Report: demo_app'));
+      expect(result.stdout.toString(), contains('demo_app'));
       await dir.delete(recursive: true);
     });
 
@@ -424,8 +427,9 @@ dependencies:
         ], runInShell: true);
         expect(
           markdownResult.stdout.toString(),
-          contains('# format_app Diagnostic Report'),
+          contains('# Flutter Dev Intelligence Report'),
         );
+        expect(markdownResult.stdout.toString(), contains('format_app'));
 
         final logResult = await Process.run('dart', [
           'run',

@@ -1,3 +1,5 @@
+import 'config.dart';
+
 /// Severity ranking for diagnostic findings.
 enum DiagnosticSeverity { info, low, medium, high, critical }
 
@@ -248,7 +250,7 @@ class DiagnosticReport {
     this.metrics = const <String, dynamic>{},
     this.warnings = const <String>[],
     this.toolName = 'flutter_dev_intelligence',
-    this.toolVersion = '0.0.1',
+    this.toolVersion = kPackageVersion,
     this.schemaVersion = '1.0',
     this.projectPath,
     this.analyzedSources = const <String>[],
@@ -328,7 +330,7 @@ class DiagnosticReport {
           .map((entry) => entry.toString())
           .toList(),
       toolName: json['toolName'] as String? ?? 'flutter_dev_intelligence',
-      toolVersion: json['toolVersion'] as String? ?? '0.0.1',
+      toolVersion: json['toolVersion'] as String? ?? kPackageVersion,
       schemaVersion: json['schemaVersion'] as String? ?? '1.0',
       projectPath: json['projectPath'] as String?,
       analyzedSources: ((json['analyzedSources'] as List?) ?? const [])

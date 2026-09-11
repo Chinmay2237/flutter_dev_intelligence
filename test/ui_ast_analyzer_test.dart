@@ -84,5 +84,100 @@ void main() {
         expect(unconstrainedIssues, isEmpty);
       },
     );
+
+    test(
+      'setState inside callback function expression does not produce false positive',
+      () {
+        const code = '''
+import 'package:flutter/material.dart';
+
+class TestWidget extends StatefulWidget {
+  const TestWidget({super.key});
+  @override
+  State<TestWidget> createState() => _TestWidgetState();
+}
+
+class _TestWidgetState extends State<TestWidget> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _index = 1;
+        });
+      },
+      child: Text('Tap \$_index'),
+    );
+  }
+}
+''';
+        final result = UiAstAnalyzer.analyzeSource(code);
+        final setStateIssues = result.issues.where(
+          (i) => i.id == 'ui_suspicious_setstate',
+        );
+        expect(setStateIssues, isEmpty);
+      },
+    );
+
+    test(
+      'setState invoked directly in build method produces high severity issue',
+      () {
+        const code = '''
+import 'package:flutter/material.dart';
+
+class TestWidget extends StatefulWidget {
+  const TestWidget({super.key});
+  @override
+  State<TestWidget> createState() => _TestWidgetState();
+}
+
+class _TestWidgetState extends State<TestWidget> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    setState(() {
+      _index = 1;
+    });
+    return Text('Index: \$_index');
+  }
+}
+''';
+        final result = UiAstAnalyzer.analyzeSource(code);
+        final setStateIssues = result.issues.where(
+          (i) => i.id == 'ui_suspicious_setstate',
+        );
+        expect(setStateIssues, hasLength(1));
+        expect(setStateIssues.first.severity, DiagnosticSeverity.high);
+      },
+    );
+
+    test(
+      'Nested ListView with NeverScrollableScrollPhysics does not trigger scroll conflict',
+      () {
+        const code = '''
+import 'package:flutter/material.dart';
+
+Widget buildTree(BuildContext context) {
+  return ListView(
+    children: [
+      ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        shrinkWrap: true,
+        children: const [Text('Item 1')],
+      ),
+    ],
+  );
+}
+''';
+        final result = UiAstAnalyzer.analyzeSource(code);
+        final nestedIssues = result.issues.where(
+          (i) => i.id == 'ui_nested_scrollable',
+        );
+        expect(nestedIssues, isEmpty);
+      },
+    );
   });
 }

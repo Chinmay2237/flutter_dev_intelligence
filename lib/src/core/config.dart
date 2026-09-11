@@ -1,3 +1,6 @@
+/// Package version constant for flutter_dev_intelligence.
+const String kPackageVersion = '0.1.0-dev.2';
+
 /// Immutable runtime configuration for Flutter Dev Intelligence.
 class DevIntelligenceConfig {
   /// Enables runtime performance collection.

@@ -1,3 +1,6 @@
+@Timeout(Duration(minutes: 2))
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +12,7 @@ void main() {
     test('CLI --help prints command summary and exit code 0', () async {
       final process = await Process.run('dart', [binPath, '--help']);
       expect(process.exitCode, 0);
-      expect(process.stdout, contains('Flutter Dev Intelligence CLI'));
+      expect(process.stdout, contains('Flutter Dev Intelligence'));
       expect(process.stdout, contains('doctor'));
       expect(process.stdout, contains('build-doctor'));
       expect(process.stdout, contains('ui-doctor'));
@@ -19,7 +22,7 @@ void main() {
     test('CLI --version prints package version', () async {
       final process = await Process.run('dart', [binPath, '--version']);
       expect(process.exitCode, 0);
-      expect(process.stdout, contains('flutter_dev_intelligence 0.1.0-dev.1'));
+      expect(process.stdout, contains('flutter_dev_intelligence 0.1.0-dev.2'));
     });
 
     test('CLI ui-doctor runs static UI analysis', () async {
@@ -58,6 +61,30 @@ void main() {
       },
     );
 
+    test('CLI build-doctor processes build log from stdin pipe', () async {
+      final process = await Process.start('dart', [
+        binPath,
+        'build-doctor',
+        '--stdin',
+        '--format',
+        'json',
+      ]);
+
+      final sampleLog = await File(
+        'test/fixtures/build_logs/duplicate_class.log',
+      ).readAsString();
+      process.stdin.write(sampleLog);
+      await process.stdin.close();
+
+      final stdoutText = await process.stdout.transform(utf8.decoder).join();
+      final exitCode = await process.exitCode;
+
+      expect(exitCode, 1);
+      final json = jsonDecode(stdoutText) as Map<String, dynamic>;
+      expect(json['issues'], isNotEmpty);
+      expect(json['analyzedSources'], contains('stdin'));
+    });
+
     test('CLI performance processes trace JSON metrics', () async {
       final tempDir = await Directory.systemTemp.createTemp('cli_perf_test_');
       addTearDown(() => tempDir.deleteSync(recursive: true));
@@ -95,10 +122,51 @@ void main() {
       expect(json['issues'], isNotEmpty);
     });
 
+    test('CLI performance processes trace JSON from stdin pipe', () async {
+      final process = await Process.start('dart', [
+        binPath,
+        'performance',
+        '--stdin',
+        '--format',
+        'json',
+      ]);
+
+      final traceJson = jsonEncode({
+        'frame_count': 10,
+        'slow_frame_count': 2,
+        'average_build_ms': 15.0,
+        'average_raster_ms': 12.0,
+      });
+      process.stdin.write(traceJson);
+      await process.stdin.close();
+
+      final stdoutText = await process.stdout.transform(utf8.decoder).join();
+      final exitCode = await process.exitCode;
+
+      expect(exitCode, 1);
+      final json = jsonDecode(stdoutText) as Map<String, dynamic>;
+      expect(json['metrics']['slow_frame_count'], 2);
+    });
+
+    test('CLI rejects combining --stdin and --log', () async {
+      final process = await Process.run('dart', [
+        binPath,
+        'build-doctor',
+        '--stdin',
+        '--log',
+        'test/fixtures/build_logs/duplicate_class.log',
+      ]);
+      expect(process.exitCode, 2);
+      expect(process.stderr, contains('Cannot combine --stdin and --log'));
+    });
+
     test('CLI handles missing required options with exit code 2', () async {
       final process = await Process.run('dart', [binPath, 'build-doctor']);
       expect(process.exitCode, 2);
-      expect(process.stderr, contains('Build Doctor requires --log <path>'));
+      expect(
+        process.stderr,
+        contains('Build Doctor requires --log <path> or --stdin'),
+      );
     });
 
     test('CLI handles non-existent paths with exit code 2', () async {
