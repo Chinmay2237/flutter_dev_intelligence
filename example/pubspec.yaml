@@ -1,0 +1,17 @@
+name: flutter_dev_intelligence_example
+description: Example usage for flutter_dev_intelligence.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.5
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_dev_intelligence:
+    path: ..
+
+flutter:
+  uses-material-design: true

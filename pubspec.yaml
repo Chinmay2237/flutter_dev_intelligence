@@ -1,13 +1,18 @@
 name: flutter_dev_intelligence
-description: "A new Flutter package project."
+description: >-
+  Evidence-based Flutter developer diagnostics toolkit for build issues,
+  UI quality checks, and runtime performance investigation.
 version: 0.0.1
-homepage:
+homepage: https://github.com/Chinmay2237/flutter_dev_intelligence
+repository: https://github.com/Chinmay2237/flutter_dev_intelligence
+issue_tracker: https://github.com/Chinmay2237/flutter_dev_intelligence/issues
 
 environment:
   sdk: ^3.11.5
   flutter: ">=1.17.0"
 
 dependencies:
+  analyzer: ^9.0.0
   flutter:
     sdk: flutter
 
@@ -15,6 +20,17 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+executables:
+  flutter-dev: flutter_dev
+
+topics:
+  - flutter
+  - dart
+  - developer-tools
+  - debugging
+  - performance
+  - accessibility
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

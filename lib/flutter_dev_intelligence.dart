@@ -1,5 +1,28 @@
-/// A Calculator.
-class Calculator {
-  /// Returns [value] plus 1.
-  int addOne(int value) => value + 1;
+import 'src/core/config.dart';
+
+export 'src/core/config.dart';
+export 'src/core/models.dart';
+export 'src/core/secret_redactor.dart';
+export 'src/build_doctor/build_doctor.dart';
+export 'src/build_doctor/build_doctor_cli.dart';
+export 'src/build_doctor/doctor_runner.dart';
+export 'src/build_doctor/log_parser.dart';
+export 'src/build_doctor/project_scanner.dart';
+export 'src/build_doctor/pubspec_analyzer.dart';
+export 'src/build_doctor/pubspec_lock_analyzer.dart';
+export 'src/build_doctor/reporting.dart';
+export 'src/ai/ai_provider.dart';
+export 'src/performance/performance_investigator.dart';
+export 'src/ui_doctor/ui_doctor.dart';
+export 'src/ui_doctor/ui_ast_analyzer.dart';
+
+/// Main package entrypoint for Flutter Dev Intelligence.
+class FlutterDevIntelligence {
+  const FlutterDevIntelligence._();
+
+  static DevIntelligenceConfig initialize({
+    DevIntelligenceConfig configuration = const DevIntelligenceConfig(),
+  }) {
+    return configuration;
+  }
 }
