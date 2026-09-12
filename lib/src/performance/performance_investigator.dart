@@ -259,19 +259,98 @@ class FrameTimingSummary {
   };
 
   factory FrameTimingSummary.fromJson(Map<String, dynamic> json) {
-    return FrameTimingSummary(
-      frameCount: json['frame_count'] as int? ?? 0,
-      slowFrameCount: json['slow_frame_count'] as int? ?? 0,
-      severeJankFrameCount: json['severe_jank_frame_count'] as int? ?? 0,
-      averageBuildMs: (json['average_build_ms'] as num? ?? 0.0).toDouble(),
-      averageRasterMs: (json['average_raster_ms'] as num? ?? 0.0).toDouble(),
-      maxBuildMs: (json['max_build_ms'] as num? ?? 0.0).toDouble(),
-      maxRasterMs: (json['max_raster_ms'] as num? ?? 0.0).toDouble(),
-      worstFrameMs: (json['worst_frame_ms'] as num? ?? 0.0).toDouble(),
-      p50FrameMs: (json['p50_frame_ms'] as num? ?? 0.0).toDouble(),
-      p90FrameMs: (json['p90_frame_ms'] as num? ?? 0.0).toDouble(),
-      p99FrameMs: (json['p99_frame_ms'] as num? ?? 0.0).toDouble(),
-      frameBudgetMs: (json['frame_budget_ms'] as num? ?? 16.67).toDouble(),
+    // 1. Direct summary metrics format
+    if (json.containsKey('frame_count') || json.containsKey('p90_frame_ms')) {
+      return FrameTimingSummary(
+        frameCount: json['frame_count'] as int? ?? 0,
+        slowFrameCount: json['slow_frame_count'] as int? ?? 0,
+        severeJankFrameCount: json['severe_jank_frame_count'] as int? ?? 0,
+        averageBuildMs: (json['average_build_ms'] as num? ?? 0.0).toDouble(),
+        averageRasterMs: (json['average_raster_ms'] as num? ?? 0.0).toDouble(),
+        maxBuildMs: (json['max_build_ms'] as num? ?? 0.0).toDouble(),
+        maxRasterMs: (json['max_raster_ms'] as num? ?? 0.0).toDouble(),
+        worstFrameMs: (json['worst_frame_ms'] as num? ?? 0.0).toDouble(),
+        p50FrameMs: (json['p50_frame_ms'] as num? ?? 0.0).toDouble(),
+        p90FrameMs: (json['p90_frame_ms'] as num? ?? 0.0).toDouble(),
+        p99FrameMs: (json['p99_frame_ms'] as num? ?? 0.0).toDouble(),
+        frameBudgetMs: (json['frame_budget_ms'] as num? ?? 16.67).toDouble(),
+      );
+    }
+
+    // 2. Trace events format (DevTools / Chrome Tracing JSON)
+    if (json.containsKey('traceEvents') && json['traceEvents'] is List) {
+      final events = json['traceEvents'] as List;
+      final buildMs = <double>[];
+      final rasterMs = <double>[];
+
+      for (final event in events) {
+        if (event is Map) {
+          final name = event['name']?.toString() ?? '';
+          final durMicros = (event['dur'] as num?)?.toDouble() ?? 0.0;
+          if (name.contains('Build') ||
+              name.contains('VSYNC') ||
+              name.contains('Animate')) {
+            if (durMicros > 0) buildMs.add(durMicros / 1000.0);
+          } else if (name.contains('Raster') ||
+              name.contains('GPU') ||
+              name.contains('GPURasterizer')) {
+            if (durMicros > 0) rasterMs.add(durMicros / 1000.0);
+          }
+        }
+      }
+
+      if (buildMs.isNotEmpty || rasterMs.isNotEmpty) {
+        if (buildMs.isEmpty) buildMs.addAll(List.filled(rasterMs.length, 0.0));
+        if (rasterMs.isEmpty) rasterMs.addAll(List.filled(buildMs.length, 0.0));
+        return FrameTimingSummary.fromDurations(
+          buildMs: buildMs,
+          rasterMs: rasterMs,
+        );
+      }
+    }
+
+    // 3. Raw frames list format: { "frames": [ { "buildMs": 10.5, "rasterMs": 4.2 }, ... ] }
+    if (json.containsKey('frames') && json['frames'] is List) {
+      final framesList = json['frames'] as List;
+      final buildMs = <double>[];
+      final rasterMs = <double>[];
+      for (final item in framesList) {
+        if (item is Map) {
+          final b =
+              (item['buildMs'] ??
+                      item['build_ms'] ??
+                      item['buildDuration'] ??
+                      0.0)
+                  as num;
+          final r =
+              (item['rasterMs'] ??
+                      item['raster_ms'] ??
+                      item['rasterDuration'] ??
+                      0.0)
+                  as num;
+          buildMs.add(b.toDouble());
+          rasterMs.add(r.toDouble());
+        }
+      }
+      return FrameTimingSummary.fromDurations(
+        buildMs: buildMs,
+        rasterMs: rasterMs,
+      );
+    }
+
+    // Fallback: empty summary
+    return const FrameTimingSummary(
+      frameCount: 0,
+      slowFrameCount: 0,
+      severeJankFrameCount: 0,
+      averageBuildMs: 0.0,
+      averageRasterMs: 0.0,
+      maxBuildMs: 0.0,
+      maxRasterMs: 0.0,
+      worstFrameMs: 0.0,
+      p50FrameMs: 0.0,
+      p90FrameMs: 0.0,
+      p99FrameMs: 0.0,
     );
   }
 

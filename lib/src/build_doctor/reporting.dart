@@ -55,6 +55,7 @@ class DiagnosticReportRenderer {
     String green(String text) => style(text, '32');
     String boldRed(String text) => style(text, '1;31');
     String boldYellow(String text) => style(text, '1;33');
+    String boldBlue(String text) => style(text, '1;34');
     String boldCyan(String text) => style(text, '1;36');
 
     final buffer = StringBuffer();
@@ -81,9 +82,8 @@ class DiagnosticReportRenderer {
         (report.severityCounts['high'] ?? 0) +
         (report.severityCounts['critical'] ?? 0);
     final mediumCount = report.severityCounts['medium'] ?? 0;
-    final lowCount =
-        (report.severityCounts['low'] ?? 0) +
-        (report.severityCounts['info'] ?? 0);
+    final lowCount = report.severityCounts['low'] ?? 0;
+    final infoCount = report.severityCounts['info'] ?? 0;
     final warningCount = report.warnings.length;
 
     buffer.writeln('  ${bold('Issues')}       $totalIssues');
@@ -94,6 +94,9 @@ class DiagnosticReportRenderer {
       '  ${bold('Medium')}       ${mediumCount > 0 ? yellow(mediumCount.toString()) : mediumCount.toString()}',
     );
     buffer.writeln('  ${bold('Low')}          $lowCount');
+    if (infoCount > 0) {
+      buffer.writeln('  ${bold('Info')}         $infoCount');
+    }
     if (warningCount > 0) {
       buffer.writeln(
         '  ${bold('Warnings')}     ${yellow(warningCount.toString())}',
@@ -118,8 +121,10 @@ class DiagnosticReportRenderer {
             severityLabel = boldYellow('MEDIUM');
             break;
           case DiagnosticSeverity.low:
+            severityLabel = boldBlue('LOW');
+            break;
           case DiagnosticSeverity.info:
-            severityLabel = boldCyan('LOW');
+            severityLabel = boldCyan('INFO');
             break;
         }
 
@@ -227,14 +232,16 @@ class DiagnosticReportRenderer {
         (report.severityCounts['high'] ?? 0) +
         (report.severityCounts['critical'] ?? 0);
     final mediumCount = report.severityCounts['medium'] ?? 0;
-    final lowCount =
-        (report.severityCounts['low'] ?? 0) +
-        (report.severityCounts['info'] ?? 0);
+    final lowCount = report.severityCounts['low'] ?? 0;
+    final infoCount = report.severityCounts['info'] ?? 0;
 
     buffer.writeln('- **Total Issues:** ${report.issues.length}');
     buffer.writeln('  - **High:** $highCount');
     buffer.writeln('  - **Medium:** $mediumCount');
     buffer.writeln('  - **Low:** $lowCount');
+    if (infoCount > 0) {
+      buffer.writeln('  - **Info:** $infoCount');
+    }
     buffer.writeln('- **Warnings:** ${report.warnings.length}');
     buffer.writeln();
 

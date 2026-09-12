@@ -1,4 +1,4 @@
-import 'package:flutter_dev_intelligence_example/main.dart';
+import '../lib/main.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

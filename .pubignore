@@ -1,0 +1,4 @@
+# Temporary release / audit documentation
+PHASE_*
+*.log
+.buildlog/

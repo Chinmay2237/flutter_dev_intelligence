@@ -43,6 +43,7 @@ abstract class UiAstRule {
     DiagnosticSeverity? customSeverity,
     double? customConfidence,
     String? customId,
+    String? customTitle,
     DiagnosticCategory? customCategory,
   }) {
     final location = context.lineInfo.getLocation(node.offset);
@@ -50,7 +51,7 @@ abstract class UiAstRule {
       id: customId ?? id,
       category: customCategory ?? category,
       severity: customSeverity ?? severity,
-      title: title,
+      title: customTitle ?? title,
       description: description,
       filePath: context.filePath,
       line: location.lineNumber,
@@ -140,13 +141,16 @@ class UiNestedScrollableRule extends UiAstRule {
           createIssue(
             node,
             context,
-            customSeverity: DiagnosticSeverity.low,
+            customId: 'ui_nested_horizontal_scrollable',
+            customTitle: 'Nested horizontal scrollable pattern detected',
+            customSeverity: DiagnosticSeverity.info,
             customConfidence: 0.6,
             description:
                 'Horizontal $typeName is nested inside vertical $parentScrollable. '
-                'Verify gesture boundaries for horizontal scrolling within vertical list.',
+                'This is a common valid Flutter layout pattern (e.g., carousels, category rows) and is not automatically an error. '
+                'Review only if gesture conflicts or layout issues occur.',
             suggestion:
-                'Ensure item touch targets and horizontal swipe gestures do not conflict with parent scroll.',
+                'Verify gesture boundaries for horizontal scrolling within vertical list if interaction issues are reported.',
           ),
         );
         return issues;

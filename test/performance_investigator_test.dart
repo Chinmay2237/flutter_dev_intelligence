@@ -82,5 +82,35 @@ void main() {
       final json = comparison.toJson();
       expect(json['is_regression'], isTrue);
     });
+
+    test('FrameTimingSummary.fromJson parses DevTools traceEvents format', () {
+      final devToolsJson = {
+        'traceEvents': [
+          {'name': 'VSYNC', 'dur': 18000},
+          {'name': 'GPURasterizer::Draw', 'dur': 12000},
+          {'name': 'BuildWidget', 'dur': 22000},
+          {'name': 'Rasterizer', 'dur': 15000},
+        ],
+      };
+
+      final summary = FrameTimingSummary.fromJson(devToolsJson);
+      expect(summary.frameCount, 2);
+      expect(summary.averageBuildMs, 20.0);
+      expect(summary.averageRasterMs, 13.5);
+    });
+
+    test('FrameTimingSummary.fromJson parses raw frames list format', () {
+      final framesJson = {
+        'frames': [
+          {'buildMs': 10.0, 'rasterMs': 5.0},
+          {'buildMs': 20.0, 'rasterMs': 15.0},
+        ],
+      };
+
+      final summary = FrameTimingSummary.fromJson(framesJson);
+      expect(summary.frameCount, 2);
+      expect(summary.averageBuildMs, 15.0);
+      expect(summary.averageRasterMs, 10.0);
+    });
   });
 }

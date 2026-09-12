@@ -37,7 +37,7 @@ void main() {
 
       expect(process.exitCode, inInclusiveRange(0, 1));
       final json = jsonDecode(process.stdout as String) as Map<String, dynamic>;
-      expect(json['projectName'], 'static-ui-analysis');
+      expect(json['projectName'], 'flutter_dev_intelligence');
       expect(json['analyzedSources'], isNotEmpty);
     });
 
@@ -178,6 +178,30 @@ void main() {
       ]);
       expect(process.exitCode, 2);
       expect(process.stderr, contains('Project directory not found'));
+    });
+
+    test('CLI rejects --stdin for doctor and ui-doctor commands', () async {
+      final docProcess = await Process.run('dart', [
+        binPath,
+        'doctor',
+        '--stdin',
+      ]);
+      expect(docProcess.exitCode, 2);
+      expect(
+        docProcess.stderr,
+        contains('The doctor command does not support --stdin'),
+      );
+
+      final uiProcess = await Process.run('dart', [
+        binPath,
+        'ui-doctor',
+        '--stdin',
+      ]);
+      expect(uiProcess.exitCode, 2);
+      expect(
+        uiProcess.stderr,
+        contains('The ui-doctor command does not support --stdin'),
+      );
     });
   });
 }

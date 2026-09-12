@@ -69,7 +69,8 @@ void main() {
 
       expect(issues.length, 1);
       expect(issues.first.id, 'unknown_log_pattern');
-      expect(issues.first.severity, DiagnosticSeverity.low);
+      expect(issues.first.severity, DiagnosticSeverity.info);
+      expect(issues.first.title, contains('No known build issue detected'));
     });
 
     test('Handles empty build log string gracefully', () {

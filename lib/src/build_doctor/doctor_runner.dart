@@ -117,13 +117,24 @@ class DoctorRunner {
       }
     }
 
-    unavailable.add('AI explanation provider: no provider is configured.');
+    unavailable.add(
+      'AI explanation provider: disabled (no AI provider configured; deterministic analysis is active).',
+    );
     return DiagnosticReport(
       id: 'doctor_${started.microsecondsSinceEpoch}',
       createdAt: started,
-      projectName: pubspec.packageName.isEmpty
-          ? 'unknown-project'
-          : pubspec.packageName,
+      projectName: pubspec.packageName.isNotEmpty
+          ? pubspec.packageName
+          : () {
+              final absolutePath = Directory(options.projectPath).absolute.path;
+              final basename = absolutePath
+                  .replaceAll(RegExp(r'[/\\]+$'), '')
+                  .split(Platform.pathSeparator)
+                  .last;
+              return (basename.isEmpty || basename == '.')
+                  ? 'flutter-project'
+                  : basename;
+            }(),
       projectPath: options.projectPath,
       issues: issues,
       metrics: <String, dynamic>{
@@ -135,7 +146,7 @@ class DoctorRunner {
       analyzedSources: sources,
       limitations: const <String>[
         'Runtime frame timing requires execution inside a Flutter application and was not measured by this CLI run.',
-        'UI analysis is limited to runtime viewport heuristics; no Dart AST analysis was performed.',
+        'Static UI findings are based on Dart AST source analysis. Runtime layout behavior is not executed.',
       ],
       skippedAnalyses: skipped,
       unavailableAnalyses: unavailable,

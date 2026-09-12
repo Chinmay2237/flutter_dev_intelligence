@@ -602,10 +602,10 @@ class BuildDoctorRuleRegistry {
         DiagnosticIssue(
           id: 'unknown_log_pattern',
           category: DiagnosticCategory.build,
-          severity: DiagnosticSeverity.low,
-          title: 'No matching deterministic build issue detected',
+          severity: DiagnosticSeverity.info,
+          title: 'No known build issue detected',
           description:
-              'The build output did not match the implemented deterministic rule set.',
+              'The supplied log was received successfully, but no supported error pattern matched.',
           source: 'build log',
           evidence: [
             EvidenceReference(
@@ -620,15 +620,17 @@ class BuildDoctorRuleRegistry {
           suggestions: const [
             FixSuggestion(
               action:
-                  'Inspect the full build log and review the failing task output.',
+                  'Inspect the full build output and task logs if the build or analysis still fails.',
               details:
-                  'Inspect the full build log and review the failing task output.',
+                  'Inspect the full build output and task logs if the build or analysis still fails.',
               riskLevel: FixRiskLevel.low,
               isSafeToAutomate: false,
               requiresUserConfirmation: true,
             ),
           ],
-          confidence: 0.25,
+          confidence: null,
+          limitation:
+              'Analysis is limited to implemented deterministic build log rules.',
         ),
       );
     }

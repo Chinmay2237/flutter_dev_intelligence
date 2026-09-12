@@ -259,6 +259,8 @@ class PubspecLockAnalyzer {
               package != 'sdk' &&
               package != 'flutter' &&
               package != 'sky_engine' &&
+              package != 'flutter_test' &&
+              package != 'dart' &&
               !packages.contains(package),
         )
         .toList(growable: false);

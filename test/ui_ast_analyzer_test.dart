@@ -179,5 +179,38 @@ Widget buildTree(BuildContext context) {
         expect(nestedIssues, isEmpty);
       },
     );
+
+    test(
+      'Horizontal ListView nested in vertical scrollable produces INFO severity',
+      () {
+        const code = '''
+import 'package:flutter/material.dart';
+
+Widget buildTree(BuildContext context) {
+  return ListView(
+    children: [
+      SizedBox(
+        height: 120,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: const [Text('Item 1')],
+        ),
+      ),
+    ],
+  );
+}
+''';
+        final result = UiAstAnalyzer.analyzeSource(code);
+        final horizontalIssues = result.issues.where(
+          (i) => i.id == 'ui_nested_horizontal_scrollable',
+        );
+        expect(horizontalIssues, hasLength(1));
+        expect(horizontalIssues.first.severity, DiagnosticSeverity.info);
+        expect(
+          horizontalIssues.first.title,
+          'Nested horizontal scrollable pattern detected',
+        );
+      },
+    );
   });
 }

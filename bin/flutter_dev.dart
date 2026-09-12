@@ -58,9 +58,28 @@ Future<void> main(List<String> arguments) async {
   }
 }
 
+Future<String> _resolveProjectName(String projectPath) async {
+  final pubspec = await PubspecAnalyzer.analyze(projectPath);
+  if (pubspec.packageName.isNotEmpty) {
+    return pubspec.packageName;
+  }
+  final dir = Directory(projectPath);
+  final basename = dir.absolute.path
+      .replaceAll(RegExp(r'[/\\]+$'), '')
+      .split(Platform.pathSeparator)
+      .last;
+  return (basename.isEmpty || basename == '.') ? 'flutter-project' : basename;
+}
+
 Future<int> _runDoctor(List<String> arguments) async {
   final options = _parseCommonArgs(arguments);
   if (options.errorExitCode != null) return options.errorExitCode!;
+
+  if (options.useStdin) {
+    stderr.writeln('Error: The doctor command does not support --stdin.');
+    stderr.writeln('Use --project <directory> instead.');
+    return 2;
+  }
 
   if (!await Directory(options.projectPath).exists()) {
     stderr.writeln(
@@ -122,14 +141,18 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
 
   try {
     final issues = BuildLogParser.parse(logContent);
+    final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
       id: 'build_doctor_${DateTime.now().microsecondsSinceEpoch}',
       createdAt: DateTime.now(),
-      projectName: 'build-log-analysis',
+      projectName: projectName,
       projectPath: options.projectPath,
       issues: issues,
       analyzedSources: [sourceLabel],
+      limitations: const [
+        'Build analysis evaluates supplied logs and does not execute the build itself.',
+      ],
     );
 
     return await _renderAndOutput(report, options, commandName: 'build-doctor');
@@ -144,6 +167,12 @@ Future<int> _runUiDoctor(List<String> arguments) async {
   final options = _parseCommonArgs(arguments);
   if (options.errorExitCode != null) return options.errorExitCode!;
 
+  if (options.useStdin) {
+    stderr.writeln('Error: The ui-doctor command does not support --stdin.');
+    stderr.writeln('Use --project <directory> instead.');
+    return 2;
+  }
+
   final libDir = Directory(
     '${options.projectPath}${Platform.pathSeparator}lib',
   );
@@ -157,16 +186,17 @@ Future<int> _runUiDoctor(List<String> arguments) async {
   try {
     final results = await UiAstAnalyzer.analyzeDirectory(libDir.path);
     final issues = results.expand((r) => r.issues).toList();
+    final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
       id: 'ui_doctor_${DateTime.now().microsecondsSinceEpoch}',
       createdAt: DateTime.now(),
-      projectName: 'static-ui-analysis',
+      projectName: projectName,
       projectPath: options.projectPath,
       issues: issues,
       analyzedSources: results.map((r) => r.filePath).toList(),
       limitations: const [
-        'Static UI analysis is based on Dart AST heuristics. Runtime layout verification is recommended.',
+        'Static UI findings are based on Dart AST source analysis. Runtime layout behavior is not executed.',
       ],
     );
 
@@ -221,14 +251,23 @@ Future<int> _runPerformance(List<String> arguments) async {
     }
     final summary = FrameTimingSummary.fromJson(parsedJson);
     final recommendations = summary.generateRecommendations();
+    final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
       id: 'perf_doctor_${DateTime.now().microsecondsSinceEpoch}',
       createdAt: DateTime.now(),
-      projectName: 'performance-analysis',
+      projectName: projectName,
+      projectPath: options.projectPath,
       issues: recommendations,
       metrics: summary.toJson(),
       analyzedSources: [sourceLabel],
+      limitations: summary.frameCount == 0
+          ? const [
+              'Performance analysis requires valid trace data. No frame timing events were recognized in input.',
+            ]
+          : const [
+              'Performance analysis requires a supported frame trace. This command does not automatically profile a running application.',
+            ],
     );
 
     return await _renderAndOutput(report, options, commandName: 'performance');
@@ -418,7 +457,14 @@ Future<int> _renderAndOutput(
     stdout.writeln('Analyzed sources: ${report.analyzedSources.join(', ')}');
   }
 
-  return report.issues.isEmpty ? 0 : 1;
+  final hasActionableIssues = report.issues.any(
+    (issue) =>
+        issue.severity == DiagnosticSeverity.high ||
+        issue.severity == DiagnosticSeverity.critical ||
+        issue.severity == DiagnosticSeverity.medium,
+  );
+
+  return hasActionableIssues ? 1 : 0;
 }
 
 void _printHelp() {

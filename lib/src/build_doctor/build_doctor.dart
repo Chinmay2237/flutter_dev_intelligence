@@ -16,8 +16,8 @@ class BuildDoctor {
     return DiagnosticIssue(
       id: 'build_log_analysis',
       category: DiagnosticCategory.build,
-      severity: DiagnosticSeverity.low,
-      title: 'No clear deterministic build issue found',
+      severity: DiagnosticSeverity.info,
+      title: 'No known build issue detected',
       description:
           'The provided log did not match a known compatibility pattern.',
       evidence: [
