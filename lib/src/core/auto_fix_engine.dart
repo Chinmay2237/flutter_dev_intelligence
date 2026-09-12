@@ -1,4 +1,5 @@
 import 'dart:io';
+import '../ui_doctor/ast_parser.dart';
 import 'models.dart';
 
 /// Result of an automated fix planning or application run.
@@ -71,7 +72,7 @@ class AutoFixEngine {
     );
   }
 
-  /// Applies safe automated fixes to project files with explicit safety guardrails.
+  /// Applies safe automated fixes to project files with explicit safety guardrails and syntax validation.
   static Future<AutoFixResult> applyFixes(
     List<DiagnosticIssue> issues, {
     bool createBackups = true,
@@ -87,6 +88,7 @@ class AutoFixEngine {
     final backupFiles = <String>[];
     final diffs = <String>[];
     final skipped = <String>[];
+    var anyFailures = false;
 
     for (final issue in issues) {
       for (final suggestion in issue.suggestions) {
@@ -132,6 +134,18 @@ class AutoFixEngine {
             continue;
           }
 
+          // AST Syntax Validation for Dart files
+          if (path.endsWith('.dart')) {
+            final parseResult = AstParser.parse(updatedContent, filePath: path);
+            if (parseResult.parseErrors.isNotEmpty) {
+              anyFailures = true;
+              skipped.add(
+                'Skipped fix for ${issue.id} on $path: Proposed fix produced invalid Dart syntax (${parseResult.parseErrors.first}).',
+              );
+              continue;
+            }
+          }
+
           if (createBackups) {
             backupPath = '$path.bak';
             await file.copy(backupPath);
@@ -143,6 +157,7 @@ class AutoFixEngine {
             modifiedFiles.add(path);
             diffs.add('--- $path\n+++ $path\n${suggestion.proposedChange}');
           } catch (writeError) {
+            anyFailures = true;
             if (backupPath != null && await File(backupPath).exists()) {
               await File(backupPath).copy(path);
             }
@@ -151,13 +166,14 @@ class AutoFixEngine {
             );
           }
         } catch (readError) {
+          anyFailures = true;
           skipped.add('Failed to read target file $path: $readError');
         }
       }
     }
 
     return AutoFixResult(
-      success: true,
+      success: !anyFailures,
       modifiedFiles: modifiedFiles.toSet().toList(),
       backupFiles: backupFiles,
       diffs: diffs,

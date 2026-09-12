@@ -1,3 +1,14 @@
+## 1.0.0
+
+### Production Release (Stable)
+* **Configuration & Suppression System**: Documented YAML project schema (`flutter_dev_intelligence.yaml`) with support for enabled/disabled rules, severity/confidence thresholds, path exclusions (`exclude`, `include`, `exclude_tests`, `exclude_examples`, `exclude_generated`), scale limits, and fine-grained suppression rules with expiration dates.
+* **AST UI Diagnostics**: 17 AST layout, lifecycle, accessibility, and resource management rules covering scrollable conflicts, unconstrained flex containers, controller disposal (`AnimationController`, `ScrollController`, `TextEditingController`, `FocusNode`), stream/timer cleanup, async mounted checks (`context.mounted`), and accessibility tooltips/labels.
+* **Multi-Platform Build Log Engine**: 40 deterministic rules analyzing Android (Kotlin, AGP, Java major version mismatch, AAPT2, R8/ProGuard, NDK, multidex, duplicate class), iOS (Xcode, CocoaPods, provisioning signing, deployment targets, module imports, arm64/x86_64 arch mismatches), and Dart/Flutter tool exit logs.
+* **Performance Trace Investigator**: DevTools Chrome trace (`traceEvents`) and frame timing array analysis with percentiles (p50..p99), hardware refresh rate budget evaluation (60Hz / 120Hz), UI vs GPU jank classification, and up to 50,000 trace event capping.
+* **CLI Experience & Output Contracts**: Terminal layout with ANSI semantic colors, versioned 1.0 JSON report contract, and GitHub Flavored Markdown exporter.
+* **Privacy, AI & Security**: Zero-network local-first privacy defaults, secret redaction engine (OpenAI, AWS, GCP, Bearer tokens, home paths), and opt-in AI advisory engine.
+* **Scale Hardening**: Configurable scale limits (`maxFileSizeBytes`, `maxLogSizeBytes`, `maxTraceEvents`, `maxIssuesCount`), file size safeguards (> 2MB), 10MB head/tail log truncation, pre-compiled static regex instances, monorepo path deduplication, and fault-isolated rule execution.
+
 ## 0.1.0-dev.3
 
 ### Production Release & Packaging Enhancements

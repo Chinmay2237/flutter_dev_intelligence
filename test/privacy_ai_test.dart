@@ -18,8 +18,8 @@ PathMac: /Users/alice/Projects/flutter_app/lib/main.dart
 
         final redacted = PrivacyRedactor.redact(text);
 
-        expect(redacted, contains('api_key=[REDACTED]'));
-        expect(redacted, contains('Authorization: Bearer [REDACTED]'));
+        expect(redacted, contains('[REDACTED_OPENAI_KEY]'));
+        expect(redacted, contains('Authorization: [REDACTED]'));
         expect(
           redacted,
           contains('https://[REDACTED]@internal.example.com/data'),
@@ -79,7 +79,7 @@ PathMac: /Users/alice/Projects/flutter_app/lib/main.dart
 
       expect(response, isNotNull);
       expect(response!.isAdvisory, isTrue);
-      expect(capturedRequest.summary, contains('api_key=[REDACTED]'));
+      expect(capturedRequest.summary, contains('[REDACTED_OPENAI_KEY]'));
       expect(capturedRequest.summary, contains('~/app'));
       expect(capturedRequest.evidence.first, contains('Bearer [REDACTED]'));
     });

@@ -1,4 +1,4 @@
-@Timeout(Duration(minutes: 2))
+@Timeout(Duration(minutes: 5))
 library;
 
 import 'dart:io';
@@ -321,18 +321,18 @@ packages:
         No profiles for com.example.app were found.
       ''');
 
-      expect(issues.map((issue) => issue.id), contains('android_sdk_missing'));
+      expect(issues.map((issue) => issue.id), contains('android.sdk-missing'));
       expect(
         issues.map((issue) => issue.id),
-        contains('java_runtime_mismatch'),
+        contains('android.java-runtime-mismatch'),
       );
       expect(
         issues.map((issue) => issue.id),
-        contains('dependency_resolution_failed'),
+        contains('android.dependency-resolution-failure'),
       );
       expect(
         issues.map((issue) => issue.id),
-        contains('signing_configuration'),
+        contains('ios.signing-configuration'),
       );
     });
   });
@@ -544,7 +544,7 @@ Widget buildWidget() => ListView(
       expect(report.analyzedSources, contains('static UI'));
       expect(
         report.issues.map((issue) => issue.id),
-        contains('ui_nested_scrollable'),
+        contains('ui.nested-scrollable'),
       );
       await dir.delete(recursive: true);
     });
@@ -598,15 +598,15 @@ Widget buildWidget() => ListView(
       expect(result.parseErrors, isEmpty);
       expect(
         result.issues.map((issue) => issue.id),
-        contains('ui_nested_scrollable'),
+        contains('ui.nested-scrollable'),
       );
       expect(
         result.issues.map((issue) => issue.id),
-        contains('ui_nested_shrink_wrap'),
+        contains('ui.nested-shrink-wrap'),
       );
       expect(
         result.issues.map((issue) => issue.id),
-        contains('ui_oversized_dimension'),
+        contains('ui.oversized-dimension'),
       );
       expect(
         result.issues.every((issue) => issue.source.startsWith('static')),

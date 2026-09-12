@@ -1,6 +1,5 @@
 #!/usr/bin/env dart
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_dev_intelligence/flutter_dev_intelligence.dart';
@@ -38,12 +37,22 @@ Future<void> main(List<String> arguments) async {
 
     case 'ui-doctor':
     case 'ui':
-      exitCode = await _runUiDoctor(arguments.skip(1).toList());
+      final args = command == 'ui'
+          ? (arguments.length > 1 && arguments[1] == 'doctor'
+                ? arguments.skip(2).toList()
+                : arguments.skip(1).toList())
+          : arguments.skip(1).toList();
+      exitCode = await _runUiDoctor(args);
       return;
 
     case 'performance':
     case 'perf':
-      exitCode = await _runPerformance(arguments.skip(1).toList());
+      final args = command == 'perf'
+          ? (arguments.length > 1 && arguments[1] == 'doctor'
+                ? arguments.skip(2).toList()
+                : arguments.skip(1).toList())
+          : arguments.skip(1).toList();
+      exitCode = await _runPerformance(args);
       return;
 
     default:
@@ -88,9 +97,26 @@ Future<int> _runDoctor(List<String> arguments) async {
     return 2;
   }
 
+  final configValidation = await ProjectConfig.findAndLoad(
+    options.projectPath,
+    customConfigPath: options.configPath,
+  );
+  if (!configValidation.isValid) {
+    stderr.writeln('Error: Invalid project configuration:');
+    for (final err in configValidation.errors) {
+      stderr.writeln('  - $err');
+    }
+    return 2;
+  }
+
   try {
     final report = await DoctorRunner.run(
-      DoctorOptions(projectPath: options.projectPath, logPath: options.logPath),
+      DoctorOptions(
+        projectPath: options.projectPath,
+        logPath: options.logPath,
+        configPath: options.configPath,
+      ),
+      config: configValidation.config,
     );
     return await _renderAndOutput(report, options, commandName: 'doctor');
   } on FileSystemException catch (error) {
@@ -109,6 +135,18 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
 
   if (options.useStdin && options.logPath != null) {
     stderr.writeln('Error: Cannot combine --stdin and --log.');
+    return 2;
+  }
+
+  final configValidation = await ProjectConfig.findAndLoad(
+    options.projectPath,
+    customConfigPath: options.configPath,
+  );
+  if (!configValidation.isValid) {
+    stderr.writeln('Error: Invalid project configuration:');
+    for (final err in configValidation.errors) {
+      stderr.writeln('  - $err');
+    }
     return 2;
   }
 
@@ -140,7 +178,11 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
   }
 
   try {
-    final issues = BuildLogParser.parse(logContent);
+    final rawIssues = BuildLogParser.parse(logContent);
+    final issues = DiagnosticFilter.filterIssues(
+      rawIssues,
+      configValidation.config,
+    );
     final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
@@ -150,6 +192,7 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
       projectPath: options.projectPath,
       issues: issues,
       analyzedSources: [sourceLabel],
+      rulesExecuted: 41,
       limitations: const [
         'Build analysis evaluates supplied logs and does not execute the build itself.',
       ],
@@ -183,9 +226,28 @@ Future<int> _runUiDoctor(List<String> arguments) async {
     return 2;
   }
 
+  final configValidation = await ProjectConfig.findAndLoad(
+    options.projectPath,
+    customConfigPath: options.configPath,
+  );
+  if (!configValidation.isValid) {
+    stderr.writeln('Error: Invalid project configuration:');
+    for (final err in configValidation.errors) {
+      stderr.writeln('  - $err');
+    }
+    return 2;
+  }
+
   try {
-    final results = await UiAstAnalyzer.analyzeDirectory(libDir.path);
-    final issues = results.expand((r) => r.issues).toList();
+    final results = await UiAstAnalyzer.analyzeDirectory(
+      libDir.path,
+      config: configValidation.config,
+    );
+    final rawIssues = results.expand((r) => r.issues).toList();
+    final issues = DiagnosticFilter.filterIssues(
+      rawIssues,
+      configValidation.config,
+    );
     final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
@@ -195,6 +257,8 @@ Future<int> _runUiDoctor(List<String> arguments) async {
       projectPath: options.projectPath,
       issues: issues,
       analyzedSources: results.map((r) => r.filePath).toList(),
+      filesAnalyzed: results.length,
+      rulesExecuted: 17,
       limitations: const [
         'Static UI findings are based on Dart AST source analysis. Runtime layout behavior is not executed.',
       ],
@@ -212,9 +276,20 @@ Future<int> _runPerformance(List<String> arguments) async {
   final options = _parseCommonArgs(arguments);
   if (options.errorExitCode != null) return options.errorExitCode!;
 
-  final inputPath = options.inputPath ?? options.logPath;
-  if (options.useStdin && inputPath != null) {
+  if (options.useStdin && options.inputPath != null) {
     stderr.writeln('Error: Cannot combine --stdin and --input.');
+    return 2;
+  }
+
+  final configValidation = await ProjectConfig.findAndLoad(
+    options.projectPath,
+    customConfigPath: options.configPath,
+  );
+  if (!configValidation.isValid) {
+    stderr.writeln('Error: Invalid project configuration:');
+    for (final err in configValidation.errors) {
+      stderr.writeln('  - $err');
+    }
     return 2;
   }
 
@@ -228,14 +303,16 @@ Future<int> _runPerformance(List<String> arguments) async {
       return 2;
     }
     sourceLabel = 'stdin';
-  } else if (inputPath != null) {
-    final inputFile = File(inputPath);
+  } else if (options.inputPath != null) {
+    final inputFile = File(options.inputPath!);
     if (!await inputFile.exists()) {
-      stderr.writeln('Error: Performance trace file not found: $inputPath');
+      stderr.writeln(
+        'Error: Performance trace file not found: ${options.inputPath}',
+      );
       return 2;
     }
     jsonText = await inputFile.readAsString();
-    sourceLabel = inputPath;
+    sourceLabel = options.inputPath!;
   } else {
     stderr.writeln(
       'Error: Performance doctor requires --input <trace.json> or --stdin.',
@@ -244,13 +321,25 @@ Future<int> _runPerformance(List<String> arguments) async {
   }
 
   try {
-    final dynamic parsedJson = jsonDecode(jsonText);
-    if (parsedJson is! Map<String, dynamic>) {
-      stderr.writeln('Error: Performance trace input must be a JSON object.');
+    final parseResult = PerformanceInputParser.parse(
+      jsonText,
+      refreshRateHz: configValidation.config.refreshRateHz,
+    );
+
+    if (!parseResult.isValid || parseResult.summary == null) {
+      stderr.writeln('Error: Performance trace input could not be analyzed:');
+      for (final limitation in parseResult.limitations) {
+        stderr.writeln('  - $limitation');
+      }
       return 2;
     }
-    final summary = FrameTimingSummary.fromJson(parsedJson);
-    final recommendations = summary.generateRecommendations();
+
+    final summary = parseResult.summary!;
+    final rawIssues = summary.generateRecommendations();
+    final issues = DiagnosticFilter.filterIssues(
+      rawIssues,
+      configValidation.config,
+    );
     final projectName = await _resolveProjectName(options.projectPath);
 
     final report = DiagnosticReport(
@@ -258,16 +347,16 @@ Future<int> _runPerformance(List<String> arguments) async {
       createdAt: DateTime.now(),
       projectName: projectName,
       projectPath: options.projectPath,
-      issues: recommendations,
+      issues: issues,
       metrics: summary.toJson(),
       analyzedSources: [sourceLabel],
-      limitations: summary.frameCount == 0
+      rulesExecuted: 5,
+      warnings: parseResult.warnings,
+      limitations: parseResult.limitations.isEmpty
           ? const [
-              'Performance analysis requires valid trace data. No frame timing events were recognized in input.',
-            ]
-          : const [
               'Performance analysis requires a supported frame trace. This command does not automatically profile a running application.',
-            ],
+            ]
+          : parseResult.limitations,
     );
 
     return await _renderAndOutput(report, options, commandName: 'performance');
@@ -290,6 +379,7 @@ Future<String> _readStdin() async {
 class _CliOptions {
   _CliOptions({
     required this.projectPath,
+    this.configPath,
     this.logPath,
     this.inputPath,
     this.format = 'terminal',
@@ -298,11 +388,19 @@ class _CliOptions {
     this.verbose = false,
     this.noAi = false,
     this.useStdin = false,
+    this.useAscii = false,
     this.colorMode = ColorMode.auto,
+    this.severityFilter,
+    this.confidenceFilter,
+    this.ruleFilter,
+    this.categoryFilter,
+    this.excludeFilter,
+    this.maxIssues,
     this.errorExitCode,
   });
 
   final String projectPath;
+  final String? configPath;
   final String? logPath;
   final String? inputPath;
   final String format;
@@ -311,12 +409,20 @@ class _CliOptions {
   final bool verbose;
   final bool noAi;
   final bool useStdin;
+  final bool useAscii;
   final ColorMode colorMode;
+  final DiagnosticSeverity? severityFilter;
+  final double? confidenceFilter;
+  final String? ruleFilter;
+  final String? categoryFilter;
+  final String? excludeFilter;
+  final int? maxIssues;
   final int? errorExitCode;
 }
 
 _CliOptions _parseCommonArgs(List<String> arguments) {
   var projectPath = Directory.current.path;
+  String? configPath;
   String? logPath;
   String? inputPath;
   var format = 'terminal';
@@ -325,17 +431,31 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
   var verbose = false;
   var noAi = false;
   var useStdin = false;
+  var useAscii = false;
   var colorMode = ColorMode.auto;
+  DiagnosticSeverity? severityFilter;
+  double? confidenceFilter;
+  String? ruleFilter;
+  String? categoryFilter;
+  String? excludeFilter;
+  int? maxIssues;
 
   for (var index = 0; index < arguments.length; index += 1) {
     final argument = arguments[index];
     String? value;
     if (argument == '--project' ||
+        argument == '--config' ||
         argument == '--log' ||
         argument == '--input' ||
         argument == '--format' ||
         argument == '--output' ||
-        argument == '--color') {
+        argument == '--color' ||
+        argument == '--severity-threshold' ||
+        argument == '--confidence-threshold' ||
+        argument == '--rule' ||
+        argument == '--category' ||
+        argument == '--exclude' ||
+        argument == '--max-issues') {
       if (index + 1 >= arguments.length) {
         stderr.writeln('Error: Missing value for $argument.');
         return _CliOptions(projectPath: projectPath, errorExitCode: 2);
@@ -346,6 +466,9 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
     switch (argument) {
       case '--project':
         projectPath = value!;
+        break;
+      case '--config':
+        configPath = value!;
         break;
       case '--log':
         logPath = value!;
@@ -380,6 +503,9 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
       case '--no-color':
         colorMode = ColorMode.never;
         break;
+      case '--ascii':
+        useAscii = true;
+        break;
       case '--stdin':
         useStdin = true;
         break;
@@ -391,6 +517,60 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
         break;
       case '--no-ai':
         noAi = true;
+        break;
+      case '--severity-threshold':
+        final sev = value!.toLowerCase();
+        switch (sev) {
+          case 'critical':
+            severityFilter = DiagnosticSeverity.critical;
+            break;
+          case 'high':
+            severityFilter = DiagnosticSeverity.high;
+            break;
+          case 'medium':
+            severityFilter = DiagnosticSeverity.medium;
+            break;
+          case 'low':
+            severityFilter = DiagnosticSeverity.low;
+            break;
+          case 'info':
+            severityFilter = DiagnosticSeverity.info;
+            break;
+          default:
+            stderr.writeln(
+              'Error: Invalid --severity-threshold value: $value.',
+            );
+            return _CliOptions(projectPath: projectPath, errorExitCode: 2);
+        }
+        break;
+      case '--confidence-threshold':
+        final parsed = double.tryParse(value!);
+        if (parsed == null || parsed < 0.0 || parsed > 1.0) {
+          stderr.writeln(
+            'Error: Invalid --confidence-threshold value: $value (must be 0.0 to 1.0).',
+          );
+          return _CliOptions(projectPath: projectPath, errorExitCode: 2);
+        }
+        confidenceFilter = parsed;
+        break;
+      case '--rule':
+        ruleFilter = value!;
+        break;
+      case '--category':
+        categoryFilter = value!;
+        break;
+      case '--exclude':
+        excludeFilter = value!;
+        break;
+      case '--max-issues':
+        final parsed = int.tryParse(value!);
+        if (parsed == null || parsed < 1) {
+          stderr.writeln(
+            'Error: Invalid --max-issues value: $value (must be a positive integer).',
+          );
+          return _CliOptions(projectPath: projectPath, errorExitCode: 2);
+        }
+        maxIssues = parsed;
         break;
       default:
         if (!argument.startsWith('-') && arguments.length == 1) {
@@ -409,8 +589,14 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
     return _CliOptions(projectPath: projectPath, errorExitCode: 2);
   }
 
+  if (configPath == null &&
+      Platform.environment['FLUTTER_DEV_CONFIG'] != null) {
+    configPath = Platform.environment['FLUTTER_DEV_CONFIG'];
+  }
+
   return _CliOptions(
     projectPath: projectPath,
+    configPath: configPath,
     logPath: logPath,
     inputPath: inputPath,
     format: format,
@@ -419,15 +605,98 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
     verbose: verbose,
     noAi: noAi,
     useStdin: useStdin,
+    useAscii: useAscii,
     colorMode: colorMode,
+    severityFilter: severityFilter,
+    confidenceFilter: confidenceFilter,
+    ruleFilter: ruleFilter,
+    categoryFilter: categoryFilter,
+    excludeFilter: excludeFilter,
+    maxIssues: maxIssues,
   );
 }
 
 Future<int> _renderAndOutput(
-  DiagnosticReport report,
+  DiagnosticReport initialReport,
   _CliOptions options, {
   String? commandName,
 }) async {
+  // Apply CLI-level issue filtering
+  var filteredIssues = List<DiagnosticIssue>.of(initialReport.issues);
+
+  if (options.severityFilter != null) {
+    filteredIssues = filteredIssues
+        .where((i) => i.severity.index >= options.severityFilter!.index)
+        .toList();
+  }
+  if (options.confidenceFilter != null) {
+    filteredIssues = filteredIssues
+        .where((i) => (i.confidence ?? 1.0) >= options.confidenceFilter!)
+        .toList();
+  }
+  if (options.ruleFilter != null && options.ruleFilter!.isNotEmpty) {
+    filteredIssues = filteredIssues
+        .where(
+          (i) =>
+              i.id == options.ruleFilter ||
+              i.id.startsWith('${options.ruleFilter}.'),
+        )
+        .toList();
+  }
+  if (options.categoryFilter != null && options.categoryFilter!.isNotEmpty) {
+    filteredIssues = filteredIssues
+        .where(
+          (i) =>
+              i.category.name.toLowerCase() ==
+              options.categoryFilter!.toLowerCase(),
+        )
+        .toList();
+  }
+  if (options.excludeFilter != null && options.excludeFilter!.isNotEmpty) {
+    filteredIssues = filteredIssues
+        .where(
+          (i) =>
+              i.filePath == null ||
+              !i.filePath!.contains(options.excludeFilter!),
+        )
+        .toList();
+  }
+
+  // Deterministic Issue Sorting: Severity desc -> filePath asc -> line asc -> id asc
+  filteredIssues.sort((a, b) {
+    final sevCompare = b.severity.index.compareTo(a.severity.index);
+    if (sevCompare != 0) return sevCompare;
+    final fileCompare = (a.filePath ?? '').compareTo(b.filePath ?? '');
+    if (fileCompare != 0) return fileCompare;
+    final lineCompare = (a.line ?? 0).compareTo(b.line ?? 0);
+    if (lineCompare != 0) return lineCompare;
+    return a.id.compareTo(b.id);
+  });
+
+  if (options.maxIssues != null && filteredIssues.length > options.maxIssues!) {
+    filteredIssues = filteredIssues.take(options.maxIssues!).toList();
+  }
+
+  final report = DiagnosticReport(
+    id: initialReport.id,
+    createdAt: initialReport.createdAt,
+    projectName: initialReport.projectName,
+    projectPath: initialReport.projectPath,
+    issues: filteredIssues,
+    metrics: initialReport.metrics,
+    warnings: initialReport.warnings,
+    toolName: initialReport.toolName,
+    toolVersion: initialReport.toolVersion,
+    schemaVersion: initialReport.schemaVersion,
+    analyzedSources: initialReport.analyzedSources,
+    limitations: initialReport.limitations,
+    skippedAnalyses: initialReport.skippedAnalyses,
+    unavailableAnalyses: initialReport.unavailableAnalyses,
+    durationMs: initialReport.durationMs,
+    filesAnalyzed: initialReport.filesAnalyzed,
+    rulesExecuted: initialReport.rulesExecuted,
+  );
+
   final rendered = switch (options.format) {
     'json' => DiagnosticReportRenderer.renderJson(report),
     'markdown' => DiagnosticReportRenderer.renderMarkdown(report),
@@ -435,17 +704,25 @@ Future<int> _renderAndOutput(
       report,
       colorMode: options.colorMode,
       commandName: commandName,
+      useAscii: options.useAscii,
     ),
   };
 
   if (options.outputPath != null) {
-    await File(options.outputPath!).parent.create(recursive: true);
-    // Strip ANSI codes if saving terminal report to file unless color explicitly forced
-    final fileContent =
-        (options.format == 'terminal' && options.colorMode != ColorMode.always)
-        ? DiagnosticReportRenderer.stripAnsi(rendered)
-        : rendered;
-    await File(options.outputPath!).writeAsString('$fileContent\n');
+    try {
+      await File(options.outputPath!).parent.create(recursive: true);
+      final fileContent =
+          (options.format == 'terminal' &&
+              options.colorMode != ColorMode.always)
+          ? DiagnosticReportRenderer.stripAnsi(rendered)
+          : rendered;
+      await File(options.outputPath!).writeAsString('$fileContent\n');
+    } catch (e) {
+      stderr.writeln(
+        'Error: Failed to write output file: ${options.outputPath} ($e)',
+      );
+      return 3;
+    }
   }
 
   if (!options.quiet) {
@@ -454,17 +731,16 @@ Future<int> _renderAndOutput(
   }
 
   if (options.verbose && !options.quiet && options.format == 'terminal') {
-    stdout.writeln('Analyzed sources: ${report.analyzedSources.join(', ')}');
+    stderr.writeln('Analyzed sources: ${report.analyzedSources.join(', ')}');
   }
 
-  final hasActionableIssues = report.issues.any(
+  final hasHighOrCritical = report.issues.any(
     (issue) =>
         issue.severity == DiagnosticSeverity.high ||
-        issue.severity == DiagnosticSeverity.critical ||
-        issue.severity == DiagnosticSeverity.medium,
+        issue.severity == DiagnosticSeverity.critical,
   );
 
-  return hasActionableIssues ? 1 : 0;
+  return hasHighOrCritical ? 1 : 0;
 }
 
 void _printHelp() {
@@ -491,38 +767,67 @@ void _printHelp() {
   stdout.writeln('');
   stdout.writeln('Options:');
   stdout.writeln(
-    '  --project <path>   Project root directory (default: current directory)',
-  );
-  stdout.writeln('  --log <path>       Build log file path');
-  stdout.writeln('  --input <path>     Trace / metrics JSON file path');
-  stdout.writeln(
-    '  --stdin            Read log or trace input from standard input pipe',
+    '  --project <path>               Project root directory (default: current directory)',
   );
   stdout.writeln(
-    '  --format <format>  Output format: terminal, json, or markdown (default: terminal)',
+    '  --config <path>                Configuration file path (default: flutter_dev_intelligence.yaml)',
+  );
+  stdout.writeln('  --log <path>                   Build log file path');
+  stdout.writeln(
+    '  --input <path>                 Trace / metrics JSON file path',
   );
   stdout.writeln(
-    '  --output <path>    Write output report to specified file path',
+    '  --stdin                        Read log or trace input from standard input pipe',
   );
   stdout.writeln(
-    '  --color <mode>     Terminal color mode: auto, always, or never (default: auto)',
+    '  --format <format>              Output format: terminal, json, or markdown (default: terminal)',
   );
   stdout.writeln(
-    '  --no-color         Disable terminal colors (same as --color never)',
+    '  --output <path>                Write output report to specified file path',
   );
   stdout.writeln(
-    '  --no-ai            Disable optional AI provider enrichment',
+    '  --color <mode>                 Terminal color mode: auto, always, or never (default: auto)',
   );
   stdout.writeln(
-    '  --verbose          Print detailed execution diagnostics and stack traces',
+    '  --no-color                     Disable terminal colors (same as --color never)',
   );
-  stdout.writeln('  --quiet            Suppress stdout output');
-  stdout.writeln('  --help, -h         Show this help message');
-  stdout.writeln('  --version, -v      Show package version');
+  stdout.writeln(
+    '  --ascii                        Use ASCII character fallback formatting',
+  );
+  stdout.writeln(
+    '  --severity-threshold <sev>     Minimum severity filter: critical, high, medium, low, info',
+  );
+  stdout.writeln(
+    '  --confidence-threshold <val>   Minimum confidence threshold filter (0.0 to 1.0)',
+  );
+  stdout.writeln(
+    '  --rule <id>                    Filter issues by specific rule ID',
+  );
+  stdout.writeln(
+    '  --category <cat>               Filter issues by diagnostic category',
+  );
+  stdout.writeln(
+    '  --exclude <pattern>            Exclude files matching substring pattern',
+  );
+  stdout.writeln(
+    '  --max-issues <n>               Limit max number of reported issues',
+  );
+  stdout.writeln(
+    '  --no-ai                        Disable optional AI provider enrichment',
+  );
+  stdout.writeln(
+    '  --verbose                      Print detailed execution diagnostics and stack traces',
+  );
+  stdout.writeln('  --quiet                        Suppress stdout output');
+  stdout.writeln('  --help, -h                     Show this help message');
+  stdout.writeln('  --version, -v                  Show package version');
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln(
     '  dart run flutter_dev_intelligence:flutter_dev doctor --project .',
+  );
+  stdout.writeln(
+    '  dart run flutter_dev_intelligence:flutter_dev doctor --config custom_config.yaml',
   );
   stdout.writeln(
     '  flutter analyze 2>&1 | dart run flutter_dev_intelligence:flutter_dev build-doctor --stdin',

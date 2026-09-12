@@ -1,0 +1,231 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pub.dev/packages/flutter_dev_intelligence/contracts/diagnostic_report.schema.json",
+  "title": "DiagnosticReport",
+  "description": "Versioned JSON schema contract for flutter_dev_intelligence diagnostic reports.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "tool",
+    "analysis",
+    "summary",
+    "id",
+    "createdAt",
+    "projectName",
+    "issues"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "example": "1.0"
+    },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "example": "flutter_dev_intelligence"
+        },
+        "version": {
+          "type": "string",
+          "example": "1.0.0"
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "engine": {
+          "type": "string",
+          "enum": ["doctor", "build-doctor", "ui-doctor", "performance"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "actionable", "partial", "failed", "unknown"]
+        },
+        "durationMs": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "filesAnalyzed": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "rulesExecuted": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "critical",
+        "high",
+        "medium",
+        "low",
+        "info",
+        "actionable",
+        "total"
+      ],
+      "properties": {
+        "critical": { "type": "integer", "minimum": 0 },
+        "high": { "type": "integer", "minimum": 0 },
+        "medium": { "type": "integer", "minimum": 0 },
+        "low": { "type": "integer", "minimum": 0 },
+        "info": { "type": "integer", "minimum": 0 },
+        "actionable": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "id": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "projectName": {
+      "type": "string"
+    },
+    "projectPath": {
+      "type": ["string", "null"]
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/DiagnosticIssue"
+      }
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "skippedAnalyses": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "unavailableAnalyses": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "definitions": {
+    "DiagnosticIssue": {
+      "type": "object",
+      "required": ["id", "category", "severity", "title", "description"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "build",
+            "dependency",
+            "gradle",
+            "kotlin",
+            "java",
+            "ios",
+            "xcode",
+            "cocoapods",
+            "layout",
+            "responsive",
+            "accessibility",
+            "localization",
+            "visual",
+            "performance",
+            "startup",
+            "frame",
+            "rebuild",
+            "network",
+            "memory",
+            "architecture"
+          ]
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["info", "low", "medium", "high", "critical"]
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "filePath": {
+          "type": ["string", "null"]
+        },
+        "line": {
+          "type": ["integer", "null"]
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0.0,
+          "maximum": 1.0
+        },
+        "source": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EvidenceReference"
+          }
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/FixSuggestion"
+          }
+        }
+      }
+    },
+    "EvidenceReference": {
+      "type": "object",
+      "required": ["type", "label", "value"],
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "FixSuggestion": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "details": {
+          "type": "string"
+        },
+        "riskLevel": {
+          "type": "string",
+          "enum": ["low", "medium", "high"]
+        },
+        "isSafeToAutomate": {
+          "type": "boolean"
+        },
+        "requiresUserConfirmation": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../core/config.dart';
 import '../core/models.dart';
 import 'log_parser.dart';
 import 'project_scanner.dart';
@@ -9,18 +10,33 @@ import '../ui_doctor/ui_ast_analyzer.dart';
 
 /// Options controlling one deterministic project diagnosis.
 class DoctorOptions {
-  const DoctorOptions({required this.projectPath, this.logPath});
+  const DoctorOptions({
+    required this.projectPath,
+    this.logPath,
+    this.configPath,
+  });
 
   final String projectPath;
   final String? logPath;
+  final String? configPath;
 }
 
 /// Runs all available project-level diagnostics and combines their evidence.
 class DoctorRunner {
   const DoctorRunner();
 
-  static Future<DiagnosticReport> run(DoctorOptions options) async {
+  static Future<DiagnosticReport> run(
+    DoctorOptions options, {
+    ProjectConfig? config,
+  }) async {
     final started = DateTime.now();
+    final effectiveConfig =
+        config ??
+        (await ProjectConfig.findAndLoad(
+          options.projectPath,
+          customConfigPath: options.configPath,
+        )).config;
+
     final scan = await FlutterProjectScanner.scan(options.projectPath);
     final pubspec = await PubspecAnalyzer.analyze(options.projectPath);
     final lockfile = await PubspecLockAnalyzer.analyze(
@@ -30,14 +46,14 @@ class DoctorRunner {
         ...pubspec.devDependencies,
       ],
     );
-    final issues = <DiagnosticIssue>[];
+    final rawIssues = <DiagnosticIssue>[];
     final warnings = <String>[];
     final skipped = <String>[];
     final unavailable = <String>[];
     final sources = <String>['project', 'pubspec', 'lockfile'];
 
     if (!scan.exists) {
-      issues.add(
+      rawIssues.add(
         _issue(
           id: 'project_not_found',
           title: 'Project path not found',
@@ -49,7 +65,7 @@ class DoctorRunner {
         ),
       );
     } else if (!scan.hasPubspec) {
-      issues.add(
+      rawIssues.add(
         _issue(
           id: 'pubspec_missing',
           title: 'pubspec.yaml is missing',
@@ -74,15 +90,16 @@ class DoctorRunner {
     }
     warnings.addAll(lockfile.warnings);
 
-    if (scan.libFolderExists) {
+    if (scan.libFolderExists && effectiveConfig.enableUiDoctor) {
       final uiResults = await UiAstAnalyzer.analyzeDirectory(
         '${scan.path}${Platform.pathSeparator}lib',
+        config: effectiveConfig,
       );
       if (uiResults.isNotEmpty) {
         sources.add('static UI');
       }
       for (final result in uiResults) {
-        issues.addAll(result.issues);
+        rawIssues.addAll(result.issues);
         if (result.parseErrors.isNotEmpty) {
           warnings.add(
             'Static UI analysis could not fully parse ${result.filePath}: '
@@ -91,7 +108,7 @@ class DoctorRunner {
         }
       }
     } else {
-      skipped.add('static UI analysis (lib directory missing)');
+      skipped.add('static UI analysis');
     }
 
     if (options.logPath == null) {
@@ -99,7 +116,7 @@ class DoctorRunner {
     } else {
       final logFile = File(options.logPath!);
       if (!await logFile.exists()) {
-        issues.add(
+        rawIssues.add(
           _issue(
             id: 'build_log_missing',
             title: 'Build log not found',
@@ -112,14 +129,25 @@ class DoctorRunner {
         );
       } else {
         sources.add('build log');
-        final parsed = BuildLogParser.parse(await logFile.readAsString());
-        issues.addAll(parsed.map((issue) => _withSource(issue, 'build log')));
+        try {
+          final logContent = await logFile.readAsString();
+          final parsed = BuildLogParser.parse(
+            logContent,
+            maxLogSizeBytes: effectiveConfig.maxLogSizeBytes,
+          );
+          rawIssues.addAll(
+            parsed.map((issue) => _withSource(issue, 'build log')),
+          );
+        } catch (e) {
+          warnings.add('Failed to parse build log file ${options.logPath}: $e');
+        }
       }
     }
 
     unavailable.add(
       'AI explanation provider: disabled (no AI provider configured; deterministic analysis is active).',
     );
+    final issues = DiagnosticFilter.filterIssues(rawIssues, effectiveConfig);
     return DiagnosticReport(
       id: 'doctor_${started.microsecondsSinceEpoch}',
       createdAt: started,

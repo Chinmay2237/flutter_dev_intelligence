@@ -1,0 +1,40 @@
+{
+  "traceEvents": [
+    {
+      "name": "Build",
+      "cat": "Flutter",
+      "ph": "X",
+      "ts": 100000,
+      "dur": 22000,
+      "pid": 1,
+      "tid": 1
+    },
+    {
+      "name": "GPURasterizer::Draw",
+      "cat": "Flutter",
+      "ph": "X",
+      "ts": 125000,
+      "dur": 18000,
+      "pid": 1,
+      "tid": 2
+    },
+    {
+      "name": "Engine::BeginFrame",
+      "cat": "Flutter",
+      "ph": "X",
+      "ts": 150000,
+      "dur": 12000,
+      "pid": 1,
+      "tid": 1
+    },
+    {
+      "name": "Rasterizer::Draw",
+      "cat": "Flutter",
+      "ph": "X",
+      "ts": 165000,
+      "dur": 8000,
+      "pid": 1,
+      "tid": 2
+    }
+  ]
+}

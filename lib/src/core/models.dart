@@ -241,6 +241,8 @@ class DiagnosticReport {
   final List<String> skippedAnalyses;
   final List<String> unavailableAnalyses;
   final int? durationMs;
+  final int? filesAnalyzed;
+  final int? rulesExecuted;
 
   const DiagnosticReport({
     required this.id,
@@ -258,6 +260,8 @@ class DiagnosticReport {
     this.skippedAnalyses = const <String>[],
     this.unavailableAnalyses = const <String>[],
     this.durationMs,
+    this.filesAnalyzed,
+    this.rulesExecuted,
   });
 
   Map<String, int> get severityCounts {
@@ -292,26 +296,78 @@ class DiagnosticReport {
     return grouped;
   }
 
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'createdAt': createdAt.toIso8601String(),
-    'projectName': projectName,
-    'issues': issues.map((issue) => issue.toJson()).toList(),
-    'metrics': metrics,
-    'warnings': warnings,
-    'toolName': toolName,
-    'toolVersion': toolVersion,
-    'schemaVersion': schemaVersion,
-    'projectPath': projectPath,
-    'analyzedSources': analyzedSources,
-    'limitations': limitations,
-    'skippedAnalyses': skippedAnalyses,
-    'unavailableAnalyses': unavailableAnalyses,
-    'durationMs': durationMs,
-    'severityCounts': severityCounts,
-  };
+  Map<String, dynamic> toJson() {
+    final critical = severityCounts['critical'] ?? 0;
+    final high = severityCounts['high'] ?? 0;
+    final medium = severityCounts['medium'] ?? 0;
+    final low = severityCounts['low'] ?? 0;
+    final info = severityCounts['info'] ?? 0;
+    final actionable = critical + high + medium;
+
+    return {
+      'schemaVersion': schemaVersion,
+      'tool': {'name': toolName, 'version': toolVersion},
+      'analysis': {
+        'status': issues.isEmpty
+            ? 'completed'
+            : (actionable > 0 ? 'actionable' : 'completed'),
+        if (durationMs != null) 'durationMs': durationMs,
+        if (filesAnalyzed != null) 'filesAnalyzed': filesAnalyzed,
+        if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
+      },
+      'summary': {
+        'critical': critical,
+        'high': high,
+        'medium': medium,
+        'low': low,
+        'info': info,
+        'actionable': actionable,
+        'total': issues.length,
+      },
+      'id': id,
+      'createdAt': createdAt.toIso8601String(),
+      'projectName': projectName,
+      if (projectPath != null) 'projectPath': projectPath,
+      'issues': issues.map((issue) => issue.toJson()).toList(),
+      'metrics': metrics,
+      'warnings': warnings,
+      'toolName': toolName,
+      'toolVersion': toolVersion,
+      'analyzedSources': analyzedSources,
+      'limitations': limitations,
+      'skippedAnalyses': skippedAnalyses,
+      'unavailableAnalyses': unavailableAnalyses,
+      if (durationMs != null) 'durationMs': durationMs,
+      if (filesAnalyzed != null) 'filesAnalyzed': filesAnalyzed,
+      if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
+      'severityCounts': severityCounts,
+    };
+  }
 
   factory DiagnosticReport.fromJson(Map<String, dynamic> json) {
+    final toolMap = json['tool'] is Map ? (json['tool'] as Map) : null;
+    final analysisMap = json['analysis'] is Map
+        ? (json['analysis'] as Map)
+        : null;
+
+    final name =
+        toolMap?['name']?.toString() ??
+        json['toolName']?.toString() ??
+        'flutter_dev_intelligence';
+    final version =
+        toolMap?['version']?.toString() ??
+        json['toolVersion']?.toString() ??
+        kPackageVersion;
+
+    final dur =
+        (analysisMap?['durationMs'] as int?) ?? (json['durationMs'] as int?);
+    final files =
+        (analysisMap?['filesAnalyzed'] as int?) ??
+        (json['filesAnalyzed'] as int?);
+    final rules =
+        (analysisMap?['rulesExecuted'] as int?) ??
+        (json['rulesExecuted'] as int?);
+
     return DiagnosticReport(
       id: json['id'] as String? ?? 'report',
       createdAt:
@@ -329,8 +385,8 @@ class DiagnosticReport {
       warnings: ((json['warnings'] as List?) ?? const [])
           .map((entry) => entry.toString())
           .toList(),
-      toolName: json['toolName'] as String? ?? 'flutter_dev_intelligence',
-      toolVersion: json['toolVersion'] as String? ?? kPackageVersion,
+      toolName: name,
+      toolVersion: version,
       schemaVersion: json['schemaVersion'] as String? ?? '1.0',
       projectPath: json['projectPath'] as String?,
       analyzedSources: ((json['analyzedSources'] as List?) ?? const [])
@@ -345,7 +401,9 @@ class DiagnosticReport {
       unavailableAnalyses: ((json['unavailableAnalyses'] as List?) ?? const [])
           .map((entry) => entry.toString())
           .toList(),
-      durationMs: json['durationMs'] as int?,
+      durationMs: dur,
+      filesAnalyzed: files,
+      rulesExecuted: rules,
     );
   }
 

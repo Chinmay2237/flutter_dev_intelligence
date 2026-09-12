@@ -1,4 +1,5 @@
 import '../core/models.dart';
+import 'performance_input_parser.dart';
 
 /// Evidence-based runtime performance tracker for Flutter applications.
 class PerformanceInvestigator {
@@ -61,7 +62,7 @@ class PerformanceInvestigator {
   }
 }
 
-/// Derived metrics calculated from measured frame durations.
+/// Derived metrics calculated from measured frame durations across UI Build and GPU Raster tasks.
 class FrameTimingSummary {
   const FrameTimingSummary({
     required this.frameCount,
@@ -73,8 +74,19 @@ class FrameTimingSummary {
     required this.maxRasterMs,
     required this.worstFrameMs,
     required this.p50FrameMs,
+    required this.p75FrameMs,
     required this.p90FrameMs,
+    required this.p95FrameMs,
     required this.p99FrameMs,
+    this.minFrameMs = 0.0,
+    this.meanFrameMs = 0.0,
+    this.buildP90Ms = 0.0,
+    this.buildP95Ms = 0.0,
+    this.buildP99Ms = 0.0,
+    this.rasterP90Ms = 0.0,
+    this.rasterP95Ms = 0.0,
+    this.rasterP99Ms = 0.0,
+    this.refreshRateHz = 60.0,
     this.frameBudgetMs = 16.67,
   });
 
@@ -86,67 +98,150 @@ class FrameTimingSummary {
   final double maxBuildMs;
   final double maxRasterMs;
   final double worstFrameMs;
+  final double minFrameMs;
+  final double meanFrameMs;
   final double p50FrameMs;
+  final double p75FrameMs;
   final double p90FrameMs;
+  final double p95FrameMs;
   final double p99FrameMs;
+
+  final double buildP90Ms;
+  final double buildP95Ms;
+  final double buildP99Ms;
+
+  final double rasterP90Ms;
+  final double rasterP95Ms;
+  final double rasterP99Ms;
+
+  final double refreshRateHz;
   final double frameBudgetMs;
 
-  /// Calculates metrics from measured build/raster samples only.
+  double get slowFramePercentage =>
+      frameCount == 0 ? 0.0 : (slowFrameCount / frameCount) * 100.0;
+
+  double get severeJankFramePercentage =>
+      frameCount == 0 ? 0.0 : (severeJankFrameCount / frameCount) * 100.0;
+
+  /// Calculates metrics from measured build/raster duration samples.
   factory FrameTimingSummary.fromDurations({
     required List<double> buildMs,
     required List<double> rasterMs,
-    double slowFrameThresholdMs = 16.67,
-    double severeJankThresholdMs = 33.33,
+    double refreshRateHz = 60.0,
+    double? customBudgetMs,
   }) {
-    final count = buildMs.length < rasterMs.length
-        ? buildMs.length
-        : rasterMs.length;
-    final validBuilds = buildMs.take(count).toList();
-    final validRasters = rasterMs.take(count).toList();
-    final totals = <double>[
+    final validRefreshRate =
+        (refreshRateHz.isNaN ||
+            refreshRateHz.isInfinite ||
+            refreshRateHz < 1.0 ||
+            refreshRateHz > 240.0)
+        ? 60.0
+        : refreshRateHz;
+
+    final budgetMs = customBudgetMs ?? (1000.0 / validRefreshRate);
+    final severeJankThresholdMs = budgetMs * 2.0;
+
+    // Filter invalid numeric values (NaN, Infinity, < 0)
+    final cleanBuilds = buildMs
+        .where((v) => !v.isNaN && !v.isInfinite && v >= 0.0)
+        .toList();
+    final cleanRasters = rasterMs
+        .where((v) => !v.isNaN && !v.isInfinite && v >= 0.0)
+        .toList();
+
+    final count = cleanBuilds.length > cleanRasters.length
+        ? cleanBuilds.length
+        : cleanRasters.length;
+
+    if (count == 0) {
+      return FrameTimingSummary(
+        frameCount: 0,
+        slowFrameCount: 0,
+        severeJankFrameCount: 0,
+        averageBuildMs: 0.0,
+        averageRasterMs: 0.0,
+        maxBuildMs: 0.0,
+        maxRasterMs: 0.0,
+        worstFrameMs: 0.0,
+        p50FrameMs: 0.0,
+        p75FrameMs: 0.0,
+        p90FrameMs: 0.0,
+        p95FrameMs: 0.0,
+        p99FrameMs: 0.0,
+        refreshRateHz: validRefreshRate,
+        frameBudgetMs: budgetMs,
+      );
+    }
+
+    final normalizedBuilds = List<double>.generate(
+      count,
+      (i) => i < cleanBuilds.length ? cleanBuilds[i] : 0.0,
+    );
+    final normalizedRasters = List<double>.generate(
+      count,
+      (i) => i < cleanRasters.length ? cleanRasters[i] : 0.0,
+    );
+
+    final totalDurations = <double>[
       for (var index = 0; index < count; index += 1)
-        validBuilds[index] + validRasters[index],
+        normalizedBuilds[index] + normalizedRasters[index],
     ];
-    final sorted = List<double>.of(totals)..sort();
-    final sortedBuilds = List<double>.of(validBuilds)..sort();
-    final sortedRasters = List<double>.of(validRasters)..sort();
+
+    final sortedTotals = List<double>.of(totalDurations)..sort();
+    final sortedBuilds = List<double>.of(normalizedBuilds)..sort();
+    final sortedRasters = List<double>.of(normalizedRasters)..sort();
+
+    final slowCount = totalDurations.where((d) => d > budgetMs).length;
+    final severeCount = totalDurations
+        .where((d) => d > severeJankThresholdMs)
+        .length;
 
     return FrameTimingSummary(
       frameCount: count,
-      slowFrameCount: totals
-          .where((duration) => duration > slowFrameThresholdMs)
-          .length,
-      severeJankFrameCount: totals
-          .where((duration) => duration > severeJankThresholdMs)
-          .length,
-      averageBuildMs: _average(validBuilds),
-      averageRasterMs: _average(validRasters),
+      slowFrameCount: slowCount,
+      severeJankFrameCount: severeCount,
+      averageBuildMs: _average(normalizedBuilds),
+      averageRasterMs: _average(normalizedRasters),
       maxBuildMs: sortedBuilds.isEmpty ? 0.0 : sortedBuilds.last,
       maxRasterMs: sortedRasters.isEmpty ? 0.0 : sortedRasters.last,
-      worstFrameMs: sorted.isEmpty ? 0.0 : sorted.last,
-      p50FrameMs: _percentile(sorted, 0.50),
-      p90FrameMs: _percentile(sorted, 0.90),
-      p99FrameMs: _percentile(sorted, 0.99),
-      frameBudgetMs: slowFrameThresholdMs,
+      worstFrameMs: sortedTotals.isEmpty ? 0.0 : sortedTotals.last,
+      minFrameMs: sortedTotals.isEmpty ? 0.0 : sortedTotals.first,
+      meanFrameMs: _average(totalDurations),
+      p50FrameMs: _percentile(sortedTotals, 0.50),
+      p75FrameMs: _percentile(sortedTotals, 0.75),
+      p90FrameMs: _percentile(sortedTotals, 0.90),
+      p95FrameMs: _percentile(sortedTotals, 0.95),
+      p99FrameMs: _percentile(sortedTotals, 0.99),
+      buildP90Ms: _percentile(sortedBuilds, 0.90),
+      buildP95Ms: _percentile(sortedBuilds, 0.95),
+      buildP99Ms: _percentile(sortedBuilds, 0.99),
+      rasterP90Ms: _percentile(sortedRasters, 0.90),
+      rasterP95Ms: _percentile(sortedRasters, 0.95),
+      rasterP99Ms: _percentile(sortedRasters, 0.99),
+      refreshRateHz: validRefreshRate,
+      frameBudgetMs: budgetMs,
     );
   }
 
-  /// Generates evidence-backed recommendations based only on measured metrics exceeding thresholds.
+  /// Generates evidence-backed recommendations based on measured metrics exceeding thresholds.
   List<DiagnosticIssue> generateRecommendations() {
     if (frameCount == 0) return const [];
     final issues = <DiagnosticIssue>[];
 
+    // Rule 1: Systemic slow frames (p90 exceeds frame budget)
     if (p90FrameMs > frameBudgetMs) {
+      final severity = p90FrameMs > (frameBudgetMs * 2.0)
+          ? DiagnosticSeverity.high
+          : DiagnosticSeverity.medium;
       issues.add(
         DiagnosticIssue(
           id: 'perf_slow_frame_p90',
           category: DiagnosticCategory.frame,
-          severity: p90FrameMs > 33.33
-              ? DiagnosticSeverity.high
-              : DiagnosticSeverity.medium,
+          severity: severity,
           title: '90th percentile frame duration exceeds target budget',
           description:
-              'The p90 frame time of ${p90FrameMs.toStringAsFixed(2)}ms exceeds the budget target of ${frameBudgetMs.toStringAsFixed(2)}ms ($slowFrameCount slow frames observed out of $frameCount frames).',
+              'The p90 frame time of ${p90FrameMs.toStringAsFixed(2)}ms exceeds the budget target of ${frameBudgetMs.toStringAsFixed(2)}ms '
+              '($slowFrameCount slow frames out of $frameCount frames, ${slowFramePercentage.toStringAsFixed(1)}%).',
           source: 'runtime frame timing',
           evidence: [
             EvidenceReference(
@@ -154,12 +249,62 @@ class FrameTimingSummary {
               label: 'p90_frame_ms',
               value: '${p90FrameMs.toStringAsFixed(2)} ms',
             ),
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'frame_budget_ms',
+              value:
+                  '${frameBudgetMs.toStringAsFixed(2)} ms (${refreshRateHz.toStringAsFixed(0)} Hz)',
+            ),
           ],
           suggestions: const [
             FixSuggestion(
-              action: 'Optimize build methods and reduce offscreen GPU layers.',
+              action:
+                  'Optimize heavy build methods and isolate rebuild subtrees.',
               details:
-                  'Review rebuild frequencies and isolate animated subtrees.',
+                  'Use const constructors, RepaintBoundary, and avoid expensive computation during layout.',
+              riskLevel: FixRiskLevel.low,
+              isSafeToAutomate: false,
+              requiresUserConfirmation: true,
+            ),
+          ],
+          confidence: 0.90,
+        ),
+      );
+    }
+
+    // Rule 2: High widget build bottleneck (CPU/rebuild pressure)
+    if (averageBuildMs > (frameBudgetMs * 0.5) || buildP90Ms > frameBudgetMs) {
+      final severity = maxBuildMs > (frameBudgetMs * 2.0)
+          ? DiagnosticSeverity.high
+          : DiagnosticSeverity.medium;
+      issues.add(
+        DiagnosticIssue(
+          id: 'perf_build_bottleneck',
+          category: DiagnosticCategory.rebuild,
+          severity: severity,
+          title: 'High widget build duration detected',
+          description:
+              'Average build time is ${averageBuildMs.toStringAsFixed(2)}ms (p90 ${buildP90Ms.toStringAsFixed(2)}ms, max ${maxBuildMs.toStringAsFixed(2)}ms). '
+              'Widget builds are consuming an excessive portion of the frame budget.',
+          source: 'runtime frame timing',
+          evidence: [
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'average_build_ms',
+              value: '${averageBuildMs.toStringAsFixed(2)} ms',
+            ),
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'build_p90_ms',
+              value: '${buildP90Ms.toStringAsFixed(2)} ms',
+            ),
+          ],
+          suggestions: const [
+            FixSuggestion(
+              action:
+                  'Refactor heavy widget builds and cache immutable subtree widgets.',
+              details:
+                  'Move synchronous I/O or JSON parsing out of Widget build methods into background isolates.',
               riskLevel: FixRiskLevel.low,
               isSafeToAutomate: false,
               requiresUserConfirmation: true,
@@ -170,58 +315,32 @@ class FrameTimingSummary {
       );
     }
 
-    if (averageBuildMs > 8.33 || maxBuildMs > frameBudgetMs) {
-      issues.add(
-        DiagnosticIssue(
-          id: 'perf_build_bottleneck',
-          category: DiagnosticCategory.rebuild,
-          severity: maxBuildMs > 33.33
-              ? DiagnosticSeverity.high
-              : DiagnosticSeverity.medium,
-          title: 'High widget build duration detected',
-          description:
-              'Average build time is ${averageBuildMs.toStringAsFixed(2)}ms (peak ${maxBuildMs.toStringAsFixed(2)}ms). Widget builds are consuming a significant portion of the frame budget.',
-          source: 'runtime frame timing',
-          evidence: [
-            EvidenceReference(
-              type: EvidenceType.performanceMetric,
-              label: 'average_build_ms',
-              value: '${averageBuildMs.toStringAsFixed(2)} ms',
-            ),
-          ],
-          suggestions: const [
-            FixSuggestion(
-              action:
-                  'Use const constructors and RepaintBoundary where appropriate.',
-              details:
-                  'Avoid heavy computational work inside Widget build methods.',
-              riskLevel: FixRiskLevel.low,
-              isSafeToAutomate: false,
-              requiresUserConfirmation: true,
-            ),
-          ],
-          confidence: 0.85,
-        ),
-      );
-    }
-
-    if (averageRasterMs > 8.33 || maxRasterMs > frameBudgetMs) {
+    // Rule 3: High GPU raster bottleneck (Raster/Shader/Image pressure)
+    if (averageRasterMs > (frameBudgetMs * 0.5) ||
+        rasterP90Ms > frameBudgetMs) {
+      final severity = maxRasterMs > (frameBudgetMs * 2.0)
+          ? DiagnosticSeverity.high
+          : DiagnosticSeverity.medium;
       issues.add(
         DiagnosticIssue(
           id: 'perf_raster_bottleneck',
           category: DiagnosticCategory.performance,
-          severity: maxRasterMs > 33.33
-              ? DiagnosticSeverity.high
-              : DiagnosticSeverity.medium,
+          severity: severity,
           title: 'GPU rasterization bottleneck detected',
           description:
-              'Average raster time is ${averageRasterMs.toStringAsFixed(2)}ms (peak ${maxRasterMs.toStringAsFixed(2)}ms). GPU rasterization is taking longer than expected.',
+              'Average raster time is ${averageRasterMs.toStringAsFixed(2)}ms (p90 ${rasterP90Ms.toStringAsFixed(2)}ms, max ${maxRasterMs.toStringAsFixed(2)}ms). '
+              'GPU rasterization is taking longer than expected.',
           source: 'runtime frame timing',
           evidence: [
             EvidenceReference(
               type: EvidenceType.performanceMetric,
               label: 'average_raster_ms',
               value: '${averageRasterMs.toStringAsFixed(2)} ms',
+            ),
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'raster_p90_ms',
+              value: '${rasterP90Ms.toStringAsFixed(2)} ms',
             ),
           ],
           suggestions: const [
@@ -235,7 +354,78 @@ class FrameTimingSummary {
               requiresUserConfirmation: true,
             ),
           ],
-          confidence: 0.84,
+          confidence: 0.86,
+        ),
+      );
+    }
+
+    // Rule 4: Severe jank (frames taking > 2x budget)
+    if (severeJankFrameCount > 0 && severeJankFramePercentage > 5.0) {
+      issues.add(
+        DiagnosticIssue(
+          id: 'perf_severe_jank',
+          category: DiagnosticCategory.frame,
+          severity: DiagnosticSeverity.high,
+          title: 'Severe frame jank detected',
+          description:
+              'Observed $severeJankFrameCount severe jank frames (${severeJankFramePercentage.toStringAsFixed(1)}% of total frames) '
+              'exceeding twice the frame budget (${(frameBudgetMs * 2.0).toStringAsFixed(2)}ms).',
+          source: 'runtime frame timing',
+          evidence: [
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'severe_jank_count',
+              value: '$severeJankFrameCount frames',
+            ),
+          ],
+          suggestions: const [
+            FixSuggestion(
+              action:
+                  'Audit main thread blocking calls during user scrolling or navigation.',
+              details:
+                  'Ensure database transactions and network decodes run asynchronously.',
+              riskLevel: FixRiskLevel.medium,
+              isSafeToAutomate: false,
+              requiresUserConfirmation: true,
+            ),
+          ],
+          confidence: 0.92,
+        ),
+      );
+    }
+
+    // Rule 5: Transient peak spike (Single frame spike without high p90)
+    if (worstFrameMs > (frameBudgetMs * 3.0) && p90FrameMs <= frameBudgetMs) {
+      issues.add(
+        DiagnosticIssue(
+          id: 'perf_frame_spike_transient',
+          category: DiagnosticCategory.frame,
+          severity: DiagnosticSeverity.low,
+          title: 'Isolated transient frame duration spike',
+          description:
+              'A peak frame duration spike of ${worstFrameMs.toStringAsFixed(2)}ms was observed, '
+              'but the p90 frame time (${p90FrameMs.toStringAsFixed(2)}ms) remains within budget. '
+              'This represents a transient peak rather than systemic frame jank.',
+          source: 'runtime frame timing',
+          evidence: [
+            EvidenceReference(
+              type: EvidenceType.performanceMetric,
+              label: 'worst_frame_ms',
+              value: '${worstFrameMs.toStringAsFixed(2)} ms',
+            ),
+          ],
+          suggestions: const [
+            FixSuggestion(
+              action:
+                  'Monitor peak initialization spikes during app cold boot or route changes.',
+              details:
+                  'Pre-warm assets and defer non-critical background initialization.',
+              riskLevel: FixRiskLevel.low,
+              isSafeToAutomate: false,
+              requiresUserConfirmation: true,
+            ),
+          ],
+          confidence: 0.75,
         ),
       );
     }
@@ -247,124 +437,70 @@ class FrameTimingSummary {
     'frame_count': frameCount,
     'slow_frame_count': slowFrameCount,
     'severe_jank_frame_count': severeJankFrameCount,
+    'slow_frame_percentage': slowFramePercentage,
+    'severe_jank_frame_percentage': severeJankFramePercentage,
     'average_build_ms': averageBuildMs,
     'average_raster_ms': averageRasterMs,
     'max_build_ms': maxBuildMs,
     'max_raster_ms': maxRasterMs,
     'worst_frame_ms': worstFrameMs,
+    'min_frame_ms': minFrameMs,
+    'mean_frame_ms': meanFrameMs,
     'p50_frame_ms': p50FrameMs,
+    'p75_frame_ms': p75FrameMs,
     'p90_frame_ms': p90FrameMs,
+    'p95_frame_ms': p95FrameMs,
     'p99_frame_ms': p99FrameMs,
+    'build_p90_ms': buildP90Ms,
+    'build_p95_ms': buildP95Ms,
+    'build_p99_ms': buildP99Ms,
+    'raster_p90_ms': rasterP90Ms,
+    'raster_p95_ms': rasterP95Ms,
+    'raster_p99_ms': rasterP99Ms,
+    'refresh_rate_hz': refreshRateHz,
     'frame_budget_ms': frameBudgetMs,
   };
 
-  factory FrameTimingSummary.fromJson(Map<String, dynamic> json) {
-    // 1. Direct summary metrics format
-    if (json.containsKey('frame_count') || json.containsKey('p90_frame_ms')) {
-      return FrameTimingSummary(
-        frameCount: json['frame_count'] as int? ?? 0,
-        slowFrameCount: json['slow_frame_count'] as int? ?? 0,
-        severeJankFrameCount: json['severe_jank_frame_count'] as int? ?? 0,
-        averageBuildMs: (json['average_build_ms'] as num? ?? 0.0).toDouble(),
-        averageRasterMs: (json['average_raster_ms'] as num? ?? 0.0).toDouble(),
-        maxBuildMs: (json['max_build_ms'] as num? ?? 0.0).toDouble(),
-        maxRasterMs: (json['max_raster_ms'] as num? ?? 0.0).toDouble(),
-        worstFrameMs: (json['worst_frame_ms'] as num? ?? 0.0).toDouble(),
-        p50FrameMs: (json['p50_frame_ms'] as num? ?? 0.0).toDouble(),
-        p90FrameMs: (json['p90_frame_ms'] as num? ?? 0.0).toDouble(),
-        p99FrameMs: (json['p99_frame_ms'] as num? ?? 0.0).toDouble(),
-        frameBudgetMs: (json['frame_budget_ms'] as num? ?? 16.67).toDouble(),
-      );
+  factory FrameTimingSummary.fromJson(
+    Map<String, dynamic> json, {
+    double refreshRateHz = 60.0,
+  }) {
+    // Delegates parsing to PerformanceInputParser for robust status handling across all schemas
+    final parseResult = PerformanceInputParser.parse(
+      json,
+      refreshRateHz: refreshRateHz,
+    );
+    if (parseResult.summary != null) {
+      return parseResult.summary!;
     }
 
-    // 2. Trace events format (DevTools / Chrome Tracing JSON)
-    if (json.containsKey('traceEvents') && json['traceEvents'] is List) {
-      final events = json['traceEvents'] as List;
-      final buildMs = <double>[];
-      final rasterMs = <double>[];
-
-      for (final event in events) {
-        if (event is Map) {
-          final name = event['name']?.toString() ?? '';
-          final durMicros = (event['dur'] as num?)?.toDouble() ?? 0.0;
-          if (name.contains('Build') ||
-              name.contains('VSYNC') ||
-              name.contains('Animate')) {
-            if (durMicros > 0) buildMs.add(durMicros / 1000.0);
-          } else if (name.contains('Raster') ||
-              name.contains('GPU') ||
-              name.contains('GPURasterizer')) {
-            if (durMicros > 0) rasterMs.add(durMicros / 1000.0);
-          }
-        }
-      }
-
-      if (buildMs.isNotEmpty || rasterMs.isNotEmpty) {
-        if (buildMs.isEmpty) buildMs.addAll(List.filled(rasterMs.length, 0.0));
-        if (rasterMs.isEmpty) rasterMs.addAll(List.filled(buildMs.length, 0.0));
-        return FrameTimingSummary.fromDurations(
-          buildMs: buildMs,
-          rasterMs: rasterMs,
-        );
-      }
-    }
-
-    // 3. Raw frames list format: { "frames": [ { "buildMs": 10.5, "rasterMs": 4.2 }, ... ] }
-    if (json.containsKey('frames') && json['frames'] is List) {
-      final framesList = json['frames'] as List;
-      final buildMs = <double>[];
-      final rasterMs = <double>[];
-      for (final item in framesList) {
-        if (item is Map) {
-          final b =
-              (item['buildMs'] ??
-                      item['build_ms'] ??
-                      item['buildDuration'] ??
-                      0.0)
-                  as num;
-          final r =
-              (item['rasterMs'] ??
-                      item['raster_ms'] ??
-                      item['rasterDuration'] ??
-                      0.0)
-                  as num;
-          buildMs.add(b.toDouble());
-          rasterMs.add(r.toDouble());
-        }
-      }
-      return FrameTimingSummary.fromDurations(
-        buildMs: buildMs,
-        rasterMs: rasterMs,
-      );
-    }
-
-    // Fallback: empty summary
-    return const FrameTimingSummary(
-      frameCount: 0,
-      slowFrameCount: 0,
-      severeJankFrameCount: 0,
-      averageBuildMs: 0.0,
-      averageRasterMs: 0.0,
-      maxBuildMs: 0.0,
-      maxRasterMs: 0.0,
-      worstFrameMs: 0.0,
-      p50FrameMs: 0.0,
-      p90FrameMs: 0.0,
-      p99FrameMs: 0.0,
+    return FrameTimingSummary(
+      frameCount: (json['frame_count'] as int?) ?? 0,
+      slowFrameCount: (json['slow_frame_count'] as int?) ?? 0,
+      severeJankFrameCount: (json['severe_jank_frame_count'] as int?) ?? 0,
+      averageBuildMs: (json['average_build_ms'] as num? ?? 0.0).toDouble(),
+      averageRasterMs: (json['average_raster_ms'] as num? ?? 0.0).toDouble(),
+      maxBuildMs: (json['max_build_ms'] as num? ?? 0.0).toDouble(),
+      maxRasterMs: (json['max_raster_ms'] as num? ?? 0.0).toDouble(),
+      worstFrameMs: (json['worst_frame_ms'] as num? ?? 0.0).toDouble(),
+      p50FrameMs: (json['p50_frame_ms'] as num? ?? 0.0).toDouble(),
+      p75FrameMs: (json['p75_frame_ms'] as num? ?? 0.0).toDouble(),
+      p90FrameMs: (json['p90_frame_ms'] as num? ?? 0.0).toDouble(),
+      p95FrameMs: (json['p95_frame_ms'] as num? ?? 0.0).toDouble(),
+      p99FrameMs: (json['p99_frame_ms'] as num? ?? 0.0).toDouble(),
+      refreshRateHz: refreshRateHz,
+      frameBudgetMs: 1000.0 / refreshRateHz,
     );
   }
 
   static double _average(List<double> values) {
-    if (values.isEmpty) {
-      return 0.0;
-    }
+    if (values.isEmpty) return 0.0;
     return values.reduce((left, right) => left + right) / values.length;
   }
 
   static double _percentile(List<double> sorted, double fraction) {
-    if (sorted.isEmpty) {
-      return 0.0;
-    }
+    if (sorted.isEmpty) return 0.0;
+    if (sorted.length == 1) return sorted.first;
     final index = (sorted.length * fraction).ceil() - 1;
     return sorted[index.clamp(0, sorted.length - 1)];
   }
@@ -490,12 +626,13 @@ class FrameTimingCollector {
   }
 
   /// Summarizes collected frames into a DiagnosticReport.
-  DiagnosticReport generateReport() {
+  DiagnosticReport generateReport({double refreshRateHz = 60.0}) {
     final buildMs = _samples.map((sample) => sample.buildMs).toList();
     final rasterMs = _samples.map((sample) => sample.rasterMs).toList();
     final summary = FrameTimingSummary.fromDurations(
       buildMs: buildMs,
       rasterMs: rasterMs,
+      refreshRateHz: refreshRateHz,
     );
     final recommendations = summary.generateRecommendations();
 
