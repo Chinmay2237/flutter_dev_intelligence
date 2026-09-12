@@ -41,7 +41,7 @@ Add `flutter_dev_intelligence` to your package's `pubspec.yaml`:
 
 ```yaml
 dev_dependencies:
-  flutter_dev_intelligence: ^0.1.0-dev.2
+  flutter_dev_intelligence: ^0.1.0-dev.3
 ```
 
 Fetch dependencies:

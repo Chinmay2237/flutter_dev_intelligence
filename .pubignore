@@ -1,4 +1,23 @@
-# Temporary release / audit documentation
-PHASE_*
+# Dart & Flutter build artifacts
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+coverage/
+
+# Nested example build artifacts
+example/.dart_tool/
+example/build/
+
+# IDE & OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Temporary & build logs
 *.log
 .buildlog/
+PHASE_*

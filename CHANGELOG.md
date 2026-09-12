@@ -1,3 +1,11 @@
+## 0.1.0-dev.3
+
+### Production Release & Packaging Enhancements
+* Productized package architecture, public API docs, CLI exit-code semantics, and output formatting.
+* Fixed false-positive nested scrollable reporting by reclassifying horizontal carousels as `INFO` severity (`Nested horizontal scrollable pattern detected`).
+* Fixed build log fallback `unknown_log_pattern` severity (`INFO`) and exit code 0 when logs contain no matching error rules.
+* Updated `.pubignore` to exclude build artifacts, `.dart_tool`, and temporary reports, reducing pub.dev archive size from 40 MB down to ~50 KB.
+
 ## 0.1.0-dev.2
 
 ### Lockfile & Dependency Analyzer Fixes
