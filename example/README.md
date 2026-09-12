@@ -36,23 +36,23 @@ void main() async {
 ### Project Health Doctor
 
 ```bash
-flutter-dev doctor --project=.
+dart run flutter_dev_intelligence doctor
 ```
 
 ### Static AST UI Doctor
 
 ```bash
-flutter-dev ui-doctor --project=. --severity=medium
+dart run flutter_dev_intelligence ui-doctor --project=. --severity=medium
 ```
 
 ### Build Log Doctor
 
 ```bash
-flutter-dev build-doctor --log=build.log --format=markdown
+dart run flutter_dev_intelligence build-doctor --log=build.log --format=markdown
 ```
 
 ### Performance Investigator
 
 ```bash
-flutter-dev perf-investigator --trace=trace.json --refresh-rate=60
+dart run flutter_dev_intelligence perf-investigator --trace=trace.json --refresh-rate=60
 ```

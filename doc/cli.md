@@ -7,14 +7,16 @@ The `flutter_dev_intelligence` command-line tool provides developer diagnostics 
 ## Global Command Structure
 
 ```bash
-flutter-dev <command> [options]
+dart run flutter_dev_intelligence <command> [options]
 ```
 
-Or when activated via Dart pub:
+Or when activated globally:
 
 ```bash
-dart run flutter_dev_intelligence:flutter_dev <command> [options]
+flutter_dev_intelligence <command> [options]
 ```
+
+(Note: `flutter-dev` is also available as an executable alias for backward compatibility.)
 
 ---
 
@@ -24,7 +26,7 @@ dart run flutter_dev_intelligence:flutter_dev <command> [options]
 Runs comprehensive health checks over the project directory, `pubspec.yaml`, `pubspec.lock`, static UI AST analysis, and optional build log files.
 
 ```bash
-flutter-dev doctor --project=. --log=build.log
+dart run flutter_dev_intelligence doctor --project=. --log=build.log
 ```
 
 #### Options:
@@ -120,7 +122,7 @@ jobs:
       - name: Activate CLI
         run: dart pub global activate flutter_dev_intelligence
       - name: Run UI Doctor
-        run: flutter-dev ui-doctor --project=. --format=terminal --severity=high
+        run: flutter_dev_intelligence ui-doctor --project=. --format=terminal --severity=high
 ```
 
 ---

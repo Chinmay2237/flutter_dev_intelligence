@@ -172,8 +172,8 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
     stderr.writeln('Error: Build Doctor requires --log <path> or --stdin.');
     stderr.writeln();
     stderr.writeln('Usage:');
-    stderr.writeln('  flutter-dev build-doctor --log <path>');
-    stderr.writeln('  flutter-dev build-doctor --stdin');
+    stderr.writeln('  flutter_dev_intelligence build-doctor --log <path>');
+    stderr.writeln('  flutter_dev_intelligence build-doctor --stdin');
     return 2;
   }
 
@@ -464,6 +464,10 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
     }
 
     switch (argument) {
+      case '--help':
+      case '-h':
+        _printHelp();
+        return _CliOptions(projectPath: projectPath, errorExitCode: 0);
       case '--project':
         projectPath = value!;
         break;
@@ -749,7 +753,9 @@ void _printHelp() {
   stdout.writeln('Inspect Flutter projects, build logs, static UI patterns,');
   stdout.writeln('and performance traces with structured diagnostics.');
   stdout.writeln('');
-  stdout.writeln('Usage: flutter-dev <command> [options]');
+  stdout.writeln(
+    'Usage: flutter_dev_intelligence <command> [options] (or dart run flutter_dev_intelligence <command> [options])',
+  );
   stdout.writeln('');
   stdout.writeln('Commands:');
   stdout.writeln(
@@ -823,19 +829,17 @@ void _printHelp() {
   stdout.writeln('  --version, -v                  Show package version');
   stdout.writeln('');
   stdout.writeln('Examples:');
+  stdout.writeln('  dart run flutter_dev_intelligence doctor --project .');
   stdout.writeln(
-    '  dart run flutter_dev_intelligence:flutter_dev doctor --project .',
+    '  dart run flutter_dev_intelligence doctor --config custom_config.yaml',
   );
   stdout.writeln(
-    '  dart run flutter_dev_intelligence:flutter_dev doctor --config custom_config.yaml',
+    '  flutter analyze 2>&1 | dart run flutter_dev_intelligence build-doctor --stdin',
   );
   stdout.writeln(
-    '  flutter analyze 2>&1 | dart run flutter_dev_intelligence:flutter_dev build-doctor --stdin',
+    '  cat trace.json | dart run flutter_dev_intelligence performance --stdin',
   );
   stdout.writeln(
-    '  cat trace.json | dart run flutter_dev_intelligence:flutter_dev performance --stdin',
-  );
-  stdout.writeln(
-    '  dart run flutter_dev_intelligence:flutter_dev ui-doctor --format json --output report.json',
+    '  dart run flutter_dev_intelligence ui-doctor --format json --output report.json',
   );
 }

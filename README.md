@@ -54,12 +54,14 @@ dev_dependencies:
 
 ## Supported CLI Commands
 
+Run via `dart run flutter_dev_intelligence <command>` (or `flutter_dev_intelligence <command>` / `flutter-dev <command>` when installed globally):
+
 | Command | Aliases | Description |
 | :--- | :--- | :--- |
-| `flutter-dev doctor` | `doc` | Runs complete project health, pubspec, lockfile, UI AST, and build log diagnostics. |
-| `flutter-dev ui-doctor` | `ui` | Performs static AST analysis on Flutter Dart source files below `lib/`. |
-| `flutter-dev build-doctor` | `build` | Analyzes Android, iOS, Gradle, Xcode, or CI build log files. |
-| `flutter-dev perf-investigator` | `perf` | Analyzes DevTools Chrome traces (`traceEvents`) or frame duration arrays. |
+| `dart run flutter_dev_intelligence doctor` | `doc` | Runs complete project health, pubspec, lockfile, UI AST, and build log diagnostics. |
+| `dart run flutter_dev_intelligence ui-doctor` | `ui` | Performs static AST analysis on Flutter Dart source files below `lib/`. |
+| `dart run flutter_dev_intelligence build-doctor` | `build` | Analyzes Android, iOS, Gradle, Xcode, or CI build log files. |
+| `dart run flutter_dev_intelligence perf-investigator` | `perf` | Analyzes DevTools Chrome traces (`traceEvents`) or frame duration arrays. |
 
 ---
 
@@ -197,7 +199,7 @@ Use standard shell exit codes (`0` clean, `1` issues/error) in CI pipelines:
 - name: Run Flutter Dev Intelligence UI Check
   run: |
     dart pub global activate flutter_dev_intelligence
-    flutter-dev ui-doctor --project=. --format=terminal --severity=high
+    flutter_dev_intelligence ui-doctor --project=. --format=terminal --severity=high
 ```
 
 ---

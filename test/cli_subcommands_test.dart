@@ -8,7 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Phase 8 CLI Sub-commands & Options Tests', () {
-    const binPath = 'bin/flutter_dev.dart';
+    const binPath = 'bin/flutter_dev_intelligence.dart';
 
     test('CLI --help prints command summary and exit code 0', () async {
       final process = await Process.run('dart', [binPath, '--help']);
@@ -243,5 +243,80 @@ void main() {
         contains('The ui-doctor command does not support --stdin'),
       );
     });
+  });
+
+  group('Executable Configuration & Entry Point Tests', () {
+    test(
+      'Expected CLI entry-point file bin/flutter_dev_intelligence.dart exists',
+      () async {
+        final file = File('bin/flutter_dev_intelligence.dart');
+        expect(
+          await file.exists(),
+          isTrue,
+          reason: 'bin/flutter_dev_intelligence.dart must exist',
+        );
+      },
+    );
+
+    test('CLI entry point contains a valid main() function', () async {
+      final file = File('bin/flutter_dev_intelligence.dart');
+      final content = await file.readAsString();
+      expect(
+        content.contains('void main(') ||
+            content.contains('Future<void> main('),
+        isTrue,
+        reason:
+            'bin/flutter_dev_intelligence.dart must declare a main function',
+      );
+    });
+
+    test('CLI entry point compiles without error', () async {
+      final result = await Process.run('dart', [
+        'analyze',
+        'bin/flutter_dev_intelligence.dart',
+      ]);
+      expect(
+        result.exitCode,
+        0,
+        reason: 'Entry point file must analyze cleanly',
+      );
+    });
+
+    test(
+      'pubspec.yaml declares executables.flutter_dev_intelligence',
+      () async {
+        final pubspec = await File('pubspec.yaml').readAsString();
+        expect(pubspec, contains('executables:'));
+        expect(
+          pubspec,
+          contains('flutter_dev_intelligence: flutter_dev_intelligence'),
+        );
+      },
+    );
+
+    test('doctor command can be resolved via entry point', () async {
+      final process = await Process.run('dart', [
+        'bin/flutter_dev_intelligence.dart',
+        'doctor',
+        '--help',
+      ]);
+      expect(process.exitCode, 0);
+      expect(process.stdout, contains('doctor'));
+    });
+
+    test(
+      'invalid commands return a useful error and non-zero exit code',
+      () async {
+        final process = await Process.run('dart', [
+          'bin/flutter_dev_intelligence.dart',
+          '--unknown-flag-xyz',
+        ]);
+        expect(process.exitCode, 2);
+        expect(
+          process.stdout.toString() + process.stderr.toString(),
+          contains('Flutter Dev Intelligence'),
+        );
+      },
+    );
   });
 }

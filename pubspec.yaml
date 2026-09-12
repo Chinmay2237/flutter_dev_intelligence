@@ -26,7 +26,8 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 executables:
-  flutter-dev: flutter_dev
+  flutter_dev_intelligence: flutter_dev_intelligence
+  flutter-dev: flutter_dev_intelligence
 
 topics:
   - flutter

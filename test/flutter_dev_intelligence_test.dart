@@ -341,12 +341,12 @@ packages:
     test('prints help and version output', () async {
       final help = await Process.run('dart', [
         'run',
-        'bin/flutter_dev.dart',
+        'bin/flutter_dev_intelligence.dart',
         '--help',
       ], runInShell: true);
       final version = await Process.run('dart', [
         'run',
-        'bin/flutter_dev.dart',
+        'bin/flutter_dev_intelligence.dart',
         '--version',
       ], runInShell: true);
 
@@ -373,7 +373,7 @@ dependencies:
 
       final result = await Process.run('dart', [
         'run',
-        'bin/flutter_dev.dart',
+        'bin/flutter_dev_intelligence.dart',
         'doctor',
         dir.path,
       ], runInShell: true);
@@ -404,7 +404,7 @@ dependencies:
 
         final jsonResult = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           dir.path,
@@ -418,7 +418,7 @@ dependencies:
 
         final markdownResult = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           dir.path,
@@ -433,7 +433,7 @@ dependencies:
 
         final logResult = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           dir.path,
@@ -448,7 +448,7 @@ dependencies:
 
         final outputResult = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           dir.path,
@@ -465,7 +465,7 @@ dependencies:
 
         final nestedOutputResult = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           dir.path,
@@ -485,7 +485,7 @@ dependencies:
       () async {
         final invalidPath = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--project',
           '/path/that/does/not/exist',
@@ -498,7 +498,7 @@ dependencies:
 
         final invalidFormat = await Process.run('dart', [
           'run',
-          'bin/flutter_dev.dart',
+          'bin/flutter_dev_intelligence.dart',
           'doctor',
           '--format',
           'xml',
