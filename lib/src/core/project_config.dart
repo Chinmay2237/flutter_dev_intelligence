@@ -292,28 +292,8 @@ class ProjectConfig {
       }
 
       if (analysisObj.containsKey('severity_threshold')) {
-        final val = analysisObj['severity_threshold']?.toString().toLowerCase();
-        switch (val) {
-          case 'info':
-            severityThreshold = DiagnosticSeverity.info;
-            break;
-          case 'low':
-            severityThreshold = DiagnosticSeverity.low;
-            break;
-          case 'medium':
-            severityThreshold = DiagnosticSeverity.medium;
-            break;
-          case 'high':
-            severityThreshold = DiagnosticSeverity.high;
-            break;
-          case 'critical':
-            severityThreshold = DiagnosticSeverity.critical;
-            break;
-          default:
-            errors.add(
-              'Invalid severity_threshold "$val". Must be one of: info, low, medium, high, critical.',
-            );
-        }
+        final val = analysisObj['severity_threshold']?.toString() ?? 'info';
+        severityThreshold = DiagnosticSeverity.fromString(val);
       }
 
       if (analysisObj.containsKey('confidence_threshold')) {
@@ -636,8 +616,7 @@ class DiagnosticFilter {
     }
 
     // 2. Confidence threshold filter
-    if (issue.confidence != null &&
-        issue.confidence! < config.confidenceThreshold) {
+    if (issue.confidenceScore < config.confidenceThreshold) {
       return true;
     }
 
@@ -674,10 +653,9 @@ class DiagnosticFilter {
   static int _severityIndex(DiagnosticSeverity severity) {
     return switch (severity) {
       DiagnosticSeverity.info => 0,
-      DiagnosticSeverity.low => 1,
-      DiagnosticSeverity.medium => 2,
-      DiagnosticSeverity.high => 3,
-      DiagnosticSeverity.critical => 4,
+      DiagnosticSeverity.warning => 1,
+      DiagnosticSeverity.error => 2,
+      DiagnosticSeverity.critical => 3,
     };
   }
 }

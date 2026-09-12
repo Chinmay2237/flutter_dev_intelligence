@@ -1,231 +1,115 @@
-# Flutter Dev Intelligence (`flutter_dev_intelligence`)
+# Flutter Dev Intelligence
 
-[![Pub Version](https://img.shields.io/pub/v/flutter_dev_intelligence.svg)](https://pub.dev/packages/flutter_dev_intelligence)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![pub package](https://img.shields.io/pub/v/flutter_dev_intelligence.svg)](https://pub.dev/packages/flutter_dev_intelligence)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**`flutter_dev_intelligence`** is a deterministic, offline-first developer diagnostics toolkit for Flutter and Dart applications. It brings evidence-based static AST UI quality analysis, multi-platform build log troubleshooting (Android, iOS, Gradle, Xcode, Dart, CI), and DevTools runtime performance investigation into a single, unified developer CLI and Dart API.
-
----
-
-## What the Package Does
-
-- **Project & Build Diagnostics (`doctor`)**: Scans Flutter packages, `pubspec.yaml`, `pubspec.lock` lockfile consistency, and matches build logs against 40 deterministic root-cause rules across Android, iOS, Gradle, Xcode, and dependency resolution.
-- **Static AST UI Analysis (`ui-doctor`)**: Analyzes Dart widget AST structures to detect layout anti-patterns (nested scrollables, shrink-wrap misuse, unconstrained scrollables, Expanded/Positioned misuse, oversized dimensions, setState misuse, expensive build operations, controller disposal, and accessibility issues).
-- **Build Log Troubleshooting (`build-doctor`)**: Normalizes ANSI, line endings, and CI runner headers, then classifies build outcomes and maps exact log line evidence to root-cause fixes.
-- **Performance Investigation (`perf-investigator`)**: Parses DevTools Chrome traces, frame timings arrays, and summarized metrics to compute p50..p99 percentiles, mean, min, max, slow frame percentages, and hardware refresh rate budget suggestions.
-- **Privacy-First & Secret Redaction**: Operates 100% offline with zero network calls by default. Includes automated secret redaction for API keys (OpenAI, AWS, GCP), Bearer tokens, credentials, and user home file paths.
+**Flutter Dev Intelligence** is an offline-first diagnostic toolkit that analyzes Flutter and Dart build logs, identifies likely root causes, separates cascading failures, extracts evidence, and generates actionable debugging reports.
 
 ---
 
-## Who It Is For
+## Key Features
 
-- **Flutter Developers**: Get fast, actionable feedback on layout bugs, missing controllers disposal, and build failures directly in your terminal or IDE.
-- **Tech Leads & Monorepo Maintainers**: Enforce architectural guidelines, file size safeguards, and diagnostic rule standards across large Flutter repositories.
-- **CI / CD Pipelines**: Run deterministic diagnostic checks on pull requests with structured exit codes (`0` clean, `1` issues found) and machine-readable JSON/Markdown outputs.
-
----
-
-## What It Does NOT Do
-
-To maintain technical accuracy, `flutter_dev_intelligence` explicitly does **not**:
-- Replace Flutter DevTools or real-device profiling (it analyzes traces and static AST; it does not execute live UI layout math at runtime).
-- Guarantee zero false positives (static analysis relies on AST heuristics and confidence scoring).
-- Automatically mutate or re-write user widget code without explicit preview and user confirmation.
-- Upload source files or build logs to external servers (all analysis runs locally).
+* 🎯 **Primary Root-Cause Prioritization**: Distinguishes the primary root cause from downstream cascading failures (such as `BUILD FAILED` or `:compileDebugJavaWithJavac FAILED`).
+* 🔎 **Evidence-Backed Findings**: Every finding includes exact log references, context lines, and defensible confidence levels.
+* 🔒 **Offline & Local-First**: Performs 100% deterministic analysis locally. Automatically redacts secrets, tokens, private keys, and user home directory paths.
+* 📦 **Zero Heavy Dependencies**: Lightweight design without heavy AST parsers or network dependencies.
+* 📄 **Multi-Format Output**: Renders scannable reports in **Terminal** (with color/ASCII options), **JSON** (machine-readable), and **Markdown** (ideal for GitHub Actions and issue comments).
 
 ---
 
-## Installation
+## Quick Start
 
-### Activate as a Global CLI Tool
+### Installation
+
+Add `flutter_dev_intelligence` to your `pubspec.yaml` or run:
 
 ```bash
-dart pub global activate flutter_dev_intelligence
+flutter pub add flutter_dev_intelligence
 ```
 
-### Add to a Flutter / Dart Package
+### CLI Usage
 
-```yaml
-dev_dependencies:
-  flutter_dev_intelligence: ^1.0.0
+Analyze a build log file:
+
+```bash
+dart run flutter_dev_intelligence build-doctor --log path/to/build.log
+```
+
+Analyze build log from standard input pipe (ideal for CI pipelines):
+
+```bash
+flutter build apk 2>&1 | dart run flutter_dev_intelligence build-doctor --stdin
+```
+
+Generate a JSON report for CI artifact archiving:
+
+```bash
+dart run flutter_dev_intelligence build-doctor --log build.log --format json --output report.json
+```
+
+Generate Markdown summary for GitHub PR / Issue comments:
+
+```bash
+dart run flutter_dev_intelligence build-doctor --log build.log --format markdown
 ```
 
 ---
 
-## Supported CLI Commands
+## Supported Diagnostic Categories
 
-Run via `dart run flutter_dev_intelligence <command>` (or `flutter_dev_intelligence <command>` / `flutter-dev <command>` when installed globally):
-
-| Command | Aliases | Description |
-| :--- | :--- | :--- |
-| `dart run flutter_dev_intelligence doctor` | `doc` | Runs complete project health, pubspec, lockfile, UI AST, and build log diagnostics. |
-| `dart run flutter_dev_intelligence ui-doctor` | `ui` | Performs static AST analysis on Flutter Dart source files below `lib/`. |
-| `dart run flutter_dev_intelligence build-doctor` | `build` | Analyzes Android, iOS, Gradle, Xcode, or CI build log files. |
-| `dart run flutter_dev_intelligence perf-investigator` | `perf` | Analyzes DevTools Chrome traces (`traceEvents`) or frame duration arrays. |
+| Category | Description | Example Rule IDs |
+|---|---|---|
+| **Pub & Dependency** | Version solving failures, SDK mismatches, incompatible constraints | `PUB_VERSION_SOLVING_FAILED`, `DART_SDK_CONSTRAINT_MISMATCH` |
+| **Dart Compiler** | Unresolved imports, undefined identifiers, type mismatches, missing generated files | `DART_UNRESOLVED_IMPORT`, `DART_MISSING_GENERATED_FILE` |
+| **Android & Gradle** | Maven dependency resolution failures, SDK missing, Java/Gradle version mismatches | `GRADLE_DEPENDENCY_RESOLUTION_FAILED`, `JAVA_AGP_INCOMPATIBILITY` |
+| **iOS & CocoaPods** | Pod spec resolution errors, deployment target conflicts, signing issues | `COCOAPODS_RESOLUTION_FAILED`, `IOS_DEPLOYMENT_TARGET_TOO_LOW` |
 
 ---
 
-## Example Usage & Output
+## Dart API Usage
 
-### 1. Terminal Output (`--format=terminal`)
+You can also use `flutter_dev_intelligence` programmatically inside Dart or Flutter tools:
 
-```text
-Flutter Dev Intelligence 1.0.0
-────────────────────────────────────────────
-Command: ui-doctor
-Project: example/
-Duration: 184 ms
-Files analyzed: 42
-Rules executed: 17
+```dart
+import 'package:flutter_dev_intelligence/flutter_dev_intelligence.dart';
 
-Summary
-────────────────────────────────────────────
-Critical: 0  |  High: 1  |  Medium: 2  |  Low: 3  |  Info: 4
+void main() async {
+  final logContent = await File('build.log').readAsString();
 
-Issues
-────────────────────────────────────────────
-[HIGH] ui.nested-scrollable
-  File: lib/src/screens/feed_screen.dart:45
-  Title: Unmitigated same-axis nested scrollable widget
-  Evidence: ListView(...) nested inside SingleChildScrollView(...)
-  Suggestion: Add physics: NeverScrollableScrollPhysics() or shrinkWrap: true.
-```
+  final report = await BuildDoctor.analyzeLog(
+    logContent,
+    projectName: 'my_flutter_app',
+  );
 
-### 2. JSON Output (`--format=json`)
+  print('Total Findings: ${report.findings.length}');
+  print('Primary Root Causes: ${report.primaryFindings.length}');
 
-```json
-{
-  "schemaVersion": "1.0",
-  "tool": {
-    "name": "flutter_dev_intelligence",
-    "version": "1.0.0"
-  },
-  "analysis": {
-    "engine": "ui-doctor",
-    "status": "completed",
-    "durationMs": 184,
-    "filesAnalyzed": 42
-  },
-  "summary": {
-    "critical": 0,
-    "high": 1,
-    "medium": 2,
-    "low": 3,
-    "info": 4
-  },
-  "issues": [
-    {
-      "id": "ui.nested-scrollable",
-      "category": "layout",
-      "severity": "high",
-      "title": "Unmitigated same-axis nested scrollable widget",
-      "filePath": "lib/src/screens/feed_screen.dart",
-      "line": 45,
-      "confidence": 0.95
-    }
-  ]
+  for (final primary in report.primaryFindings) {
+    print('Primary Cause: ${primary.title} [${primary.id}]');
+    print('Likely Cause:  ${primary.likelyCause}');
+  }
 }
 ```
 
-### 3. Markdown Output (`--format=markdown`)
+---
 
-```markdown
-# Flutter Dev Intelligence Report
+## Development & Testing
 
-- **Tool:** flutter_dev_intelligence 1.0.0
-- **Engine:** ui-doctor
-- **Files Analyzed:** 42
+Run analysis and test suite:
 
-## Summary
-- **High:** 1
-- **Medium:** 2
-- **Low:** 3
-
-## Diagnostic Issues
-### [HIGH] Unmitigated same-axis nested scrollable widget (`ui.nested-scrollable`)
-- **Location:** `lib/src/screens/feed_screen.dart:45`
-- **Suggestion:** Add `NeverScrollableScrollPhysics` to inner scrollable.
+```bash
+flutter analyze
+flutter test
 ```
 
----
+Dry-run package publication:
 
-## Project Configuration (`flutter_dev_intelligence.yaml`)
-
-Place `flutter_dev_intelligence.yaml` in your project root:
-
-```yaml
-version: 1
-
-analysis:
-  severity_threshold: low
-  confidence_threshold: 0.75
-  enable_ui_doctor: true
-  enable_build_doctor: true
-  enable_performance: true
-
-paths:
-  exclude:
-    - 'build/**'
-    - '.dart_tool/**'
-    - '**/*.g.dart'
-  exclude_tests: false
-  exclude_examples: false
-
-limits:
-  max_file_size_bytes: 2097152    # Skip files > 2MB
-  max_log_size_bytes: 10485760    # 10MB head/tail log truncation
-  max_trace_events: 50000         # 50,000 trace events limit
-  max_issues_count: 500           # Cap report issue list
-
-rules:
-  disabled:
-    - 'ui.oversized-dimension'
-
-suppressions:
-  - rule: 'ui.nested-scrollable'
-    file: 'lib/src/legacy/*.dart'
-    reason: 'Legacy carousel scrollable structure maintained for backwards compatibility.'
+```bash
+dart pub publish --dry-run
 ```
-
----
-
-## CI / CD Integration
-
-Use standard shell exit codes (`0` clean, `1` issues/error) in CI pipelines:
-
-### GitHub Actions
-
-```yaml
-- name: Run Flutter Dev Intelligence UI Check
-  run: |
-    dart pub global activate flutter_dev_intelligence
-    flutter_dev_intelligence ui-doctor --project=. --format=terminal --severity=high
-```
-
----
-
-## Privacy, AI & Security Defaults
-
-- **Zero Network by Default**: 100% of diagnostic analyses run locally on your workspace.
-- **AI Integration (Opt-In Advisory)**: Optional AI explanations require explicit user opt-in (`--ai` or `ai.enabled: true`). If enabled, inputs pass through `PrivacyRedactor` to mask keys and paths before transmission.
-- **Secret Redaction**: Automatically redacts Bearer tokens, OpenAI keys (`sk-...`), AWS keys, GCP keys, passwords, and user home directory paths (`/home/user/` -> `~/`).
-
----
-
-## Resource Links
-
-- [Rule Catalog](docs/rules/README.md)
-- [CLI Reference Guide](docs/cli.md)
-- [Configuration Reference](docs/configuration.md)
-- [Privacy & Security Policy](docs/privacy_and_security.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Security Guidelines](SECURITY.md)
-- [Changelog](CHANGELOG.md)
-- [License (MIT)](LICENSE)
 
 ---
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+MIT License. See [LICENSE](LICENSE) for details.

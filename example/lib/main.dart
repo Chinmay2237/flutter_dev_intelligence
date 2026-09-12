@@ -4,33 +4,61 @@ import 'package:flutter_dev_intelligence/flutter_dev_intelligence.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize configuration with local-first defaults
+  // Initialize configuration
   const config = DevIntelligenceConfig();
   FlutterDevIntelligence.initialize(configuration: config);
-
-  // Performance tracking session
-  final performance = PerformanceInvestigator(sessionName: 'example-session');
-  performance.startSession('example-session');
-  performance.startTrace('app_initialization');
-  performance.endTrace('app_initialization', durationMs: 14.2);
 
   runApp(const ExampleApp());
 }
 
-class ExampleApp extends StatelessWidget {
+class ExampleApp extends StatefulWidget {
   const ExampleApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // Inspect current layout constraints
-    final report = UiDoctor.inspectViewport(
-      width: 360,
-      height: 640,
-      contentWidth: 360,
-      contentHeight: 640,
-    );
+  State<ExampleApp> createState() => _ExampleAppState();
+}
 
-    final terminalOutput = DiagnosticReportRenderer.renderTerminal(report);
+class _ExampleAppState extends State<ExampleApp> {
+  DiagnosticReport? _report;
+  bool _loading = true;
+
+  final String _sampleLog = '''
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Could not resolve all dependencies for configuration ':app:debugCompileClasspath'.
+> Could not find com.example.internal:core-sdk:2.1.0.
+
+Task :app:compileDebugJavaWithJavac FAILED
+BUILD FAILED in 3s
+''';
+
+  @override
+  void initState() {
+    super.initState();
+    _analyzeLog();
+  }
+
+  Future<void> _analyzeLog() async {
+    final report = await BuildDoctor.analyzeLog(
+      _sampleLog,
+      projectName: 'example-app',
+    );
+    setState(() {
+      _report = report;
+      _loading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final report = _report;
+    final terminalOutput = report != null
+        ? DiagnosticReportRenderer.renderTerminal(
+            report,
+            colorMode: ColorMode.never,
+          )
+        : 'Analyzing log...';
 
     return MaterialApp(
       title: 'Flutter Dev Intelligence Demo',
@@ -50,7 +78,17 @@ class ExampleApp extends StatelessWidget {
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 8),
-              Text('Detected Issues: ${report.issues.length}'),
+              if (_loading)
+                const CircularProgressIndicator()
+              else ...[
+                Text('Total Findings: ${report?.findings.length ?? 0}'),
+                Text(
+                  'Primary Root Causes: ${report?.primaryFindings.length ?? 0}',
+                ),
+                Text(
+                  'Cascading Errors: ${report?.cascadingFindings.length ?? 0}',
+                ),
+              ],
               const SizedBox(height: 16),
               const Text('Terminal Report Preview:'),
               const SizedBox(height: 8),

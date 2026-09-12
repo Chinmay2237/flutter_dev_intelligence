@@ -1,9 +1,0 @@
-{
-  "frames": [
-    { "buildMs": 10.5, "rasterMs": 4.2 },
-    { "buildMs": 24.0, "rasterMs": 6.8 },
-    { "buildMs": 8.0, "rasterMs": 3.5 },
-    { "buildMs": 12.0, "rasterMs": 5.0 },
-    { "buildMs": 14.2, "rasterMs": 18.5 }
-  ]
-}

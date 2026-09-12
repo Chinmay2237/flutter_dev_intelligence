@@ -1,132 +1,101 @@
 import 'dart:io';
 import 'package:flutter_dev_intelligence/flutter_dev_intelligence.dart';
-import 'package:flutter_test/flutter_test.dart';
+import 'package:test/test.dart';
 
 void main() {
-  group('Build Doctor Rule Registry Tests', () {
-    test('Detects duplicate class from build log fixture', () async {
-      final text = await File(
-        'test/fixtures/build_logs/duplicate_class.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
+  group('Diagnostic Rules & Pipeline Unit Tests', () {
+    test('Matches Pub Version Solving Rule correctly', () async {
+      final logPath = 'test/fixtures/build_logs/pub_solver_failure.log';
+      final file = File(logPath);
+      expect(file.existsSync(), isTrue);
 
-      expect(issues.map((i) => i.id), contains('android.duplicate-class'));
-      final issue = issues.firstWhere((i) => i.id == 'android.duplicate-class');
-      expect(issue.severity, DiagnosticSeverity.high);
-      expect(issue.source, 'build log');
-    });
-
-    test('Detects Kotlin/Gradle mismatch from build log fixture', () async {
-      final text = await File(
-        'test/fixtures/build_logs/kotlin_gradle_mismatch.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
-
-      expect(issues.map((i) => i.id), contains('android.kotlin-mismatch'));
-    });
-
-    test('Detects AndroidManifest merge conflict', () async {
-      final text = await File(
-        'test/fixtures/build_logs/manifest_merge_error.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
-
-      expect(
-        issues.map((i) => i.id),
-        contains('android.manifest-merger-failure'),
+      final report = await BuildDoctor.analyzeLog(
+        await file.readAsString(),
+        sourceLabel: logPath,
       );
-      final issue = issues.firstWhere(
-        (i) => i.id == 'android.manifest-merger-failure',
-      );
-      expect(issue.confidence, greaterThanOrEqualTo(0.9));
-    });
+      expect(report.findings.isNotEmpty, isTrue);
 
-    test('Detects Swift compiler error in iOS build log', () async {
-      final text = await File(
-        'test/fixtures/build_logs/swift_compile_error.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
-
-      expect(issues.map((i) => i.id), contains('ios.swift-compiler-error'));
-    });
-
-    test('Detects missing Android SDK components', () async {
-      final text = await File(
-        'test/fixtures/build_logs/android_sdk_missing.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
-
-      expect(issues.map((i) => i.id), contains('android.sdk-missing'));
-    });
-
-    test('Detects iOS code signing and CocoaPods issues', () async {
-      final text = await File(
-        'test/fixtures/build_logs/ios_signing.log',
-      ).readAsString();
-      final issues = BuildLogParser.parse(text);
-
-      expect(issues.map((i) => i.id), contains('ios.signing-configuration'));
-    });
-
-    test('Classifies clean build output with empty issues list', () {
-      final text = 'BUILD SUCCESSFUL in 12s\n27 actionable tasks: 27 executed';
-      final result = BuildLogParser.parseDetailed(text);
-
-      expect(result.issues, isEmpty);
-      expect(result.classification.type, LogClassificationType.clean);
-    });
-
-    test('Classifies unknown failure log with explicit fallback issue', () {
-      final text =
-          'FAILURE: Build failed with an uncaught exception.\nExit code 1';
-      final result = BuildLogParser.parseDetailed(text);
-
-      expect(result.issues, hasLength(1));
-      expect(result.issues.first.id, 'build.unknown-log-pattern');
-      expect(
-        result.issues.first.description,
-        contains(
-          'The log was analyzed successfully, but no supported diagnostic pattern matched. This does not prove the build is healthy.',
-        ),
-      );
-      expect(result.classification.type, LogClassificationType.unknownPattern);
-    });
-
-    test('Strips ANSI color sequences and CI headers in normalizer', () {
-      final raw =
-          '\u001b[31m2026-09-12T10:00:00.000Z  ##[error]FAILURE: Build failed\u001b[0m';
-      final normalized = BuildLogNormalizer.normalize(raw);
-
-      expect(normalized.hasAnsi, isTrue);
-      expect(normalized.hasCiHeader, isTrue);
-      expect(normalized.cleanLog, contains('FAILURE: Build failed'));
-      expect(normalized.cleanLog.contains('\u001b'), isFalse);
+      final finding = report.findings.first;
+      expect(finding.id, equals('PUB_VERSION_SOLVING_FAILED'));
+      expect(finding.category, equals(DiagnosticCategory.pubDependency));
+      expect(finding.primaryStatus, equals(PrimaryStatus.primary));
+      expect(finding.evidence.isNotEmpty, isTrue);
     });
 
     test(
-      'Suppresses generic Gradle failure symptom when specific root cause matches',
-      () {
-        final text = '''
-Manifest merger failed with multiple errors. See logs.
-Execution failed for task ':app:processDebugMainManifest'.
-''';
-        final issues = BuildLogParser.parse(text);
+      'Matches Gradle Dependency Resolution Rule and classifies task failure as cascading',
+      () async {
+        final logPath =
+            'test/fixtures/build_logs/gradle_dependency_failure.log';
+        final file = File(logPath);
+        expect(file.existsSync(), isTrue);
 
-        expect(
-          issues.map((i) => i.id),
-          contains('android.manifest-merger-failure'),
+        final report = await BuildDoctor.analyzeLog(
+          await file.readAsString(),
+          sourceLabel: logPath,
         );
+        expect(report.findings.length, equals(2));
+
+        final primary = report.primaryFindings;
+        expect(primary.length, equals(1));
+        expect(primary.first.id, equals('GRADLE_DEPENDENCY_RESOLUTION_FAILED'));
         expect(
-          issues.map((i) => i.id),
-          isNot(contains('android.gradle-failure')),
+          primary.first.category,
+          equals(DiagnosticCategory.androidGradle),
         );
+
+        final cascading = report.cascadingFindings;
+        expect(cascading.length, equals(1));
+        expect(cascading.first.id, equals('GRADLE_TASK_FAILED'));
       },
     );
 
-    test('Handles empty build log string gracefully', () {
-      final result = BuildLogParser.parseDetailed('');
-      expect(result.issues, isEmpty);
-      expect(result.classification.type, LogClassificationType.empty);
+    test('Matches Java AGP Incompatibility Rule', () async {
+      final logPath = 'test/fixtures/build_logs/java_agp_incompatibility.log';
+      final file = File(logPath);
+      expect(file.existsSync(), isTrue);
+
+      final report = await BuildDoctor.analyzeLog(
+        await file.readAsString(),
+        sourceLabel: logPath,
+      );
+      expect(report.findings.isNotEmpty, isTrue);
+      expect(
+        report.findings.any((f) => f.id == 'JAVA_AGP_INCOMPATIBILITY'),
+        isTrue,
+      );
     });
+
+    test('Matches CocoaPods Failure Rule', () async {
+      final logPath = 'test/fixtures/build_logs/cocoapods_failure.log';
+      final file = File(logPath);
+      expect(file.existsSync(), isTrue);
+
+      final report = await BuildDoctor.analyzeLog(
+        await file.readAsString(),
+        sourceLabel: logPath,
+      );
+      expect(report.findings.isNotEmpty, isTrue);
+      expect(
+        report.findings.any((f) => f.id == 'COCOAPODS_RESOLUTION_FAILED'),
+        isTrue,
+      );
+    });
+
+    test(
+      'Handles successful build log without false positive errors',
+      () async {
+        final logPath = 'test/fixtures/build_logs/successful_build.log';
+        final file = File(logPath);
+        expect(file.existsSync(), isTrue);
+
+        final report = await BuildDoctor.analyzeLog(
+          await file.readAsString(),
+          sourceLabel: logPath,
+        );
+        expect(report.findings.isEmpty, isTrue);
+        expect(report.primaryFindings.isEmpty, isTrue);
+      },
+    );
   });
 }

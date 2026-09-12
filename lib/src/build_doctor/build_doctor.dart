@@ -1,39 +1,43 @@
 import '../core/models.dart';
-import 'log_parser.dart';
+import 'build_doctor_engine.dart';
 
-/// Build-focused diagnostics for local project or build log analysis.
+export 'build_doctor_engine.dart';
+export 'input_loader.dart';
+export 'log_normalizer.dart';
+export 'log_parser.dart';
+export 'diagnostic_rules.dart';
+export 'rule_matcher.dart';
+export 'root_cause_classifier.dart';
+export 'reporting.dart';
+
+/// Entry point facade for Build Doctor diagnostics.
 class BuildDoctor {
   const BuildDoctor();
 
-  /// Parses a raw build log and returns a high-confidence issue when a clear pattern is found.
-  static DiagnosticIssue detectIssueFromLog(String log) {
-    final parseResult = BuildLogParser.parseDetailed(log);
-    if (parseResult.issues.isNotEmpty) {
-      return parseResult.issues.first;
-    }
-
-    return DiagnosticIssue(
-      id: 'build_log_analysis',
-      category: DiagnosticCategory.build,
-      severity: DiagnosticSeverity.info,
-      title: 'No known build issue detected',
-      description:
-          'The log was analyzed successfully, but no supported diagnostic pattern matched. This does not prove the build is healthy.',
-      evidence: [
-        EvidenceReference(
-          type: EvidenceType.log,
-          label: 'build.log',
-          value: log.substring(0, log.length > 220 ? 220 : log.length),
-        ),
-      ],
-      suggestions: const [
-        FixSuggestion(
-          action: 'Inspect the full build output',
-          details:
-              'Review the complete build log and verify the failing command and dependency version constraints.',
-        ),
-      ],
-      confidence: 0.35,
+  /// Analyzes raw build log string and returns a DiagnosticReport.
+  static Future<DiagnosticReport> analyzeLog(
+    String logContent, {
+    String sourceLabel = 'build.log',
+    String projectName = 'flutter-project',
+  }) async {
+    return BuildDoctorEngine.analyze(
+      options: BuildDoctorEngineOptions(
+        logContent: logContent,
+        logPath: sourceLabel,
+        projectName: projectName,
+      ),
     );
+  }
+
+  /// Parses a raw build log and returns a top-priority diagnostic finding.
+  static Future<DiagnosticFinding?> detectIssueFromLog(String log) async {
+    final report = await analyzeLog(log);
+    if (report.primaryFindings.isNotEmpty) {
+      return report.primaryFindings.first;
+    }
+    if (report.findings.isNotEmpty) {
+      return report.findings.first;
+    }
+    return null;
   }
 }

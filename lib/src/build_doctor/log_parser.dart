@@ -1,104 +1,129 @@
-import '../core/models.dart';
-import 'build_doctor_rule.dart';
-import 'build_log_normalizer.dart';
-import 'log_classification.dart';
+import 'log_normalizer.dart';
 
-/// Result of detailed build log parsing.
-class BuildLogParseResult {
-  const BuildLogParseResult({
-    required this.issues,
-    required this.classification,
-    required this.normalizedLog,
+class LogEvent {
+  final String rawText;
+  final int startLineNumber;
+  final int endLineNumber;
+  final String? taskName;
+  final String? sourceFilePath;
+  final int? sourceLineNumber;
+  final List<String> contextLines;
+
+  const LogEvent({
+    required this.rawText,
+    required this.startLineNumber,
+    required this.endLineNumber,
+    this.taskName,
+    this.sourceFilePath,
+    this.sourceLineNumber,
+    this.contextLines = const [],
   });
-
-  final List<DiagnosticIssue> issues;
-  final LogClassificationResult classification;
-  final NormalizedLogResult normalizedLog;
 }
 
-/// Parses build log text into evidence-based issues and explicit log classification.
-class BuildLogParser {
-  const BuildLogParser({this.registry = const BuildDoctorRuleRegistry()});
+class ParsedLogOutput {
+  final NormalizedLog normalizedLog;
+  final List<LogEvent> events;
+  final List<String> taskNames;
+  final List<String> unrecognizedLines;
 
-  final BuildDoctorRuleRegistry registry;
+  const ParsedLogOutput({
+    required this.normalizedLog,
+    required this.events,
+    required this.taskNames,
+    required this.unrecognizedLines,
+  });
+}
 
-  static List<DiagnosticIssue> parse(
-    String log, {
-    BuildDoctorRuleRegistry registry = const BuildDoctorRuleRegistry(),
-    int maxLogSizeBytes = 10485760,
-  }) {
-    final result = parseDetailed(
-      log,
-      registry: registry,
-      maxLogSizeBytes: maxLogSizeBytes,
-    );
-    return result.issues;
-  }
+class LogParser {
+  static final RegExp _taskHeaderRegex = RegExp(
+    r'^(?:Task\s+|:)([a-zA-Z0-9_:-]+)\s+(FAILED|SUCCESS|SKIPPED|EXECUTED)',
+    caseSensitive: false,
+  );
 
-  static BuildLogParseResult parseDetailed(
-    String log, {
-    BuildDoctorRuleRegistry registry = const BuildDoctorRuleRegistry(),
-    int maxLogSizeBytes = 10485760,
-  }) {
-    final normalized = BuildLogNormalizer.normalize(
-      log,
-      maxLogSizeBytes: maxLogSizeBytes,
-    );
-    final matchedIssues = registry.analyze(normalized.cleanLog);
+  static final RegExp _dartCompilerErrorRegex = RegExp(
+    r'^([a-zA-Z0-9_\-/\\]+\.dart):(\d+):(\d+):\s+(Error|Warning|Info):\s+(.+)$',
+    multiLine: true,
+  );
 
-    final classification = LogClassifier.classify(
-      rawLog: log,
-      cleanLog: normalized.cleanLog,
-      matchedIssues: matchedIssues,
-    );
+  static ParsedLogOutput parse(NormalizedLog normalizedLog) {
+    final lines = normalizedLog.lines;
+    final events = <LogEvent>[];
+    final taskNames = <String>[];
+    final matchedLineIndexes = <int>{};
 
-    final issues = <DiagnosticIssue>[...matchedIssues];
+    // 1. Extract Gradle / Flutter build task headers
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final taskMatch = _taskHeaderRegex.firstMatch(line);
+      if (taskMatch != null) {
+        final taskName = taskMatch.group(1)!;
+        taskNames.add(taskName);
+        matchedLineIndexes.add(i);
 
-    // If no rules matched and log is not empty or clean, add fallback unknown issue with exact required wording
-    if (issues.isEmpty &&
-        classification.type != LogClassificationType.clean &&
-        classification.type != LogClassificationType.empty) {
-      issues.add(
-        DiagnosticIssue(
-          id: 'build.unknown-log-pattern',
-          category: DiagnosticCategory.build,
-          severity: DiagnosticSeverity.info,
-          title: 'No known build issue detected',
-          description:
-              'The log was analyzed successfully, but no supported diagnostic pattern matched. This does not prove the build is healthy.',
-          source: 'build log',
-          evidence: [
-            EvidenceReference(
-              type: EvidenceType.log,
-              label: 'build-log',
-              value: normalized.cleanLog.substring(
-                0,
-                normalized.cleanLog.length > 240
-                    ? 240
-                    : normalized.cleanLog.length,
-              ),
-            ),
-          ],
-          suggestions: [
-            FixSuggestion(
-              action: classification.recommendation,
-              details: classification.recommendation,
-              riskLevel: FixRiskLevel.low,
-              isSafeToAutomate: false,
-              requiresUserConfirmation: true,
-            ),
-          ],
-          confidence: classification.confidence,
-          limitation:
-              'Analysis is limited to implemented deterministic build log rules.',
-        ),
-      );
+        final contextStart = (i - 3 < 0) ? 0 : i - 3;
+        final contextEnd = (i + 3 >= lines.length) ? lines.length - 1 : i + 3;
+        final context = lines.sublist(contextStart, contextEnd + 1);
+
+        events.add(
+          LogEvent(
+            rawText: line,
+            startLineNumber: i + 1,
+            endLineNumber: i + 1,
+            taskName: taskName,
+            contextLines: context,
+          ),
+        );
+      }
     }
 
-    return BuildLogParseResult(
-      issues: issues,
-      classification: classification,
-      normalizedLog: normalized,
+    // 2. Extract Dart compiler error line blocks
+    for (var i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final compilerMatch = _dartCompilerErrorRegex.firstMatch(line);
+      if (compilerMatch != null) {
+        final filePath = compilerMatch.group(1);
+        final lineNum = int.tryParse(compilerMatch.group(2) ?? '');
+        matchedLineIndexes.add(i);
+
+        // Capture snippet lines following compiler error
+        var endIdx = i;
+        final snippetLines = <String>[line];
+        while (endIdx + 1 < lines.length &&
+            (lines[endIdx + 1].startsWith(' ') ||
+                lines[endIdx + 1].startsWith('\t') ||
+                lines[endIdx + 1].contains('^'))) {
+          endIdx++;
+          snippetLines.add(lines[endIdx]);
+          matchedLineIndexes.add(endIdx);
+        }
+
+        events.add(
+          LogEvent(
+            rawText: snippetLines.join('\n'),
+            startLineNumber: i + 1,
+            endLineNumber: endIdx + 1,
+            sourceFilePath: filePath,
+            sourceLineNumber: lineNum,
+            contextLines: snippetLines,
+          ),
+        );
+      }
+    }
+
+    // 3. Identify unrecognized/unmatched log lines (excluding blank lines)
+    final unrecognized = <String>[];
+    for (var i = 0; i < lines.length; i++) {
+      final trimmed = lines[i].trim();
+      if (trimmed.isNotEmpty && !matchedLineIndexes.contains(i)) {
+        unrecognized.add(lines[i]);
+      }
+    }
+
+    return ParsedLogOutput(
+      normalizedLog: normalizedLog,
+      events: events,
+      taskNames: taskNames,
+      unrecognizedLines: unrecognized,
     );
   }
 }

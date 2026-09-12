@@ -1,369 +1,397 @@
 import 'config.dart';
 
-/// Severity ranking for diagnostic findings.
-enum DiagnosticSeverity { info, low, medium, high, critical }
+/// Severity level for diagnostic findings.
+enum DiagnosticSeverity {
+  info,
+  warning,
+  error,
+  critical;
 
-/// Diagnostic categories supported by the library.
+  static DiagnosticSeverity fromString(String value) {
+    switch (value.toLowerCase()) {
+      case 'info':
+        return DiagnosticSeverity.info;
+      case 'warning':
+      case 'low':
+      case 'medium':
+        return DiagnosticSeverity.warning;
+      case 'error':
+      case 'high':
+        return DiagnosticSeverity.error;
+      case 'critical':
+        return DiagnosticSeverity.critical;
+      default:
+        return DiagnosticSeverity.error;
+    }
+  }
+}
+
+/// Confidence classification based on strength of matched evidence.
+enum DiagnosticConfidence {
+  high,
+  medium,
+  low,
+  unknown;
+
+  static DiagnosticConfidence fromString(String value) {
+    switch (value.toLowerCase()) {
+      case 'high':
+        return DiagnosticConfidence.high;
+      case 'medium':
+        return DiagnosticConfidence.medium;
+      case 'low':
+        return DiagnosticConfidence.low;
+      case 'unknown':
+      default:
+        return DiagnosticConfidence.unknown;
+    }
+  }
+}
+
+/// Diagnostic categories supported by the diagnostic engine.
 enum DiagnosticCategory {
-  build,
-  dependency,
-  gradle,
-  kotlin,
-  java,
-  ios,
-  xcode,
-  cocoapods,
-  layout,
-  responsive,
-  accessibility,
-  localization,
-  visual,
-  performance,
-  startup,
-  frame,
-  rebuild,
-  network,
-  memory,
-  architecture,
+  pubDependency('Pub & Dependency Resolution'),
+  dartCompiler('Dart Compiler'),
+  androidGradle('Android & Gradle'),
+  iosCocoaPods('iOS & CocoaPods'),
+  buildEnvironment('Build Environment & Toolchain'),
+  generalBuild('General Build Failure');
+
+  const DiagnosticCategory(this.displayName);
+  final String displayName;
+
+  static DiagnosticCategory fromString(String value) {
+    switch (value.toLowerCase()) {
+      case 'pubdependency':
+      case 'dependency':
+      case 'pub':
+        return DiagnosticCategory.pubDependency;
+      case 'dartcompiler':
+      case 'compiler':
+      case 'dart':
+        return DiagnosticCategory.dartCompiler;
+      case 'androidgradle':
+      case 'gradle':
+      case 'android':
+      case 'java':
+      case 'kotlin':
+        return DiagnosticCategory.androidGradle;
+      case 'ioscocoapods':
+      case 'cocoapods':
+      case 'ios':
+      case 'xcode':
+        return DiagnosticCategory.iosCocoaPods;
+      case 'buildenvironment':
+      case 'environment':
+      case 'sdk':
+        return DiagnosticCategory.buildEnvironment;
+      case 'generalbuild':
+      case 'build':
+      default:
+        return DiagnosticCategory.generalBuild;
+    }
+  }
 }
 
-/// Evidence source types used in reports.
-enum EvidenceType {
-  log,
-  sourceFile,
-  screenshot,
-  screenshotDiff,
-  widgetTree,
-  semanticTree,
-  timeline,
-  frameTiming,
-  performanceMetric,
-  networkTrace,
-  memorySnapshot,
-  dependencyGraph,
-  environment,
-  configuration,
+/// Classification of finding in the root-cause analysis chain.
+enum PrimaryStatus {
+  primary,
+  cascading,
+  independent,
+  unknown;
+
+  static PrimaryStatus fromString(String value) {
+    switch (value.toLowerCase()) {
+      case 'primary':
+        return PrimaryStatus.primary;
+      case 'cascading':
+      case 'secondary':
+        return PrimaryStatus.cascading;
+      case 'independent':
+        return PrimaryStatus.independent;
+      case 'unknown':
+      default:
+        return PrimaryStatus.unknown;
+    }
+  }
 }
 
-/// Reference for how a diagnosis was derived.
+/// Evidence item supporting a diagnostic finding.
 class EvidenceReference {
-  final EvidenceType type;
   final String label;
   final String value;
+  final String type;
+  final int? lineNumber;
   final Map<String, dynamic>? metadata;
 
   const EvidenceReference({
-    required this.type,
     required this.label,
     required this.value,
+    this.type = 'log',
+    this.lineNumber,
     this.metadata,
   });
 
   Map<String, dynamic> toJson() => {
-    'type': type.name,
     'label': label,
     'value': value,
-    'metadata': metadata ?? const <String, dynamic>{},
+    'type': type,
+    if (lineNumber != null) 'lineNumber': lineNumber,
+    if (metadata != null && metadata!.isNotEmpty) 'metadata': metadata,
   };
 
   factory EvidenceReference.fromJson(Map<String, dynamic> json) {
     return EvidenceReference(
-      type: EvidenceType.values.byName(json['type'] as String? ?? 'log'),
-      label: json['label'] as String? ?? 'evidence',
+      label: json['label'] as String? ?? 'Evidence',
       value: json['value'] as String? ?? '',
+      type: json['type'] as String? ?? 'log',
+      lineNumber: json['lineNumber'] is int
+          ? json['lineNumber'] as int
+          : (json['line'] is int ? json['line'] as int : null),
       metadata: (json['metadata'] as Map?)?.cast<String, dynamic>(),
     );
   }
 }
 
-/// Risk levels for proposed automated or manual fixes.
-enum FixRiskLevel { low, medium, high }
-
-/// Concrete suggestion to fix an issue with risk and automation metadata.
+/// Actionable fix recommendation.
 class FixSuggestion {
   final String action;
   final String details;
-  final FixRiskLevel riskLevel;
-  final String? proposedChange;
-  final bool isSafeToAutomate;
-  final bool requiresUserConfirmation;
 
-  const FixSuggestion({
-    required this.action,
-    required this.details,
-    this.riskLevel = FixRiskLevel.low,
-    this.proposedChange,
-    this.isSafeToAutomate = false,
-    this.requiresUserConfirmation = true,
-  });
+  const FixSuggestion({required this.action, this.details = ''});
 
-  Map<String, dynamic> toJson() => {
-    'action': action,
-    'details': details,
-    'riskLevel': riskLevel.name,
-    'proposedChange': proposedChange,
-    'isSafeToAutomate': isSafeToAutomate,
-    'requiresUserConfirmation': requiresUserConfirmation,
-  };
+  Map<String, dynamic> toJson() => {'action': action, 'details': details};
 
   factory FixSuggestion.fromJson(Map<String, dynamic> json) {
     return FixSuggestion(
-      action: json['action'] as String? ?? 'Review the issue',
+      action:
+          json['action'] as String? ??
+          json['step'] as String? ??
+          'Review the issue',
       details: json['details'] as String? ?? '',
-      riskLevel: FixRiskLevel.values.byName(
-        json['riskLevel'] as String? ?? 'low',
-      ),
-      proposedChange: json['proposedChange'] as String?,
-      isSafeToAutomate: json['isSafeToAutomate'] as bool? ?? false,
-      requiresUserConfirmation:
-          json['requiresUserConfirmation'] as bool? ?? true,
     );
   }
 }
 
-/// Validation result for diagnostic recommendations.
-class ValidationResult {
-  final bool passed;
-  final String message;
-
-  const ValidationResult({required this.passed, required this.message});
-
-  Map<String, dynamic> toJson() => {'passed': passed, 'message': message};
-
-  factory ValidationResult.fromJson(Map<String, dynamic> json) {
-    return ValidationResult(
-      passed: json['passed'] as bool? ?? false,
-      message: json['message'] as String? ?? '',
-    );
-  }
-}
-
-/// A single, evidence-backed diagnosis.
-class DiagnosticIssue {
+/// A single evidence-based diagnostic finding.
+class DiagnosticFinding {
   final String id;
+  final String title;
   final DiagnosticCategory category;
   final DiagnosticSeverity severity;
-  final String title;
-  final String description;
+  final DiagnosticConfidence confidence;
+  final String summary;
+  final String likelyCause;
+  final List<EvidenceReference> evidence;
+  final List<FixSuggestion> recommendations;
+  final PrimaryStatus primaryStatus;
+  final String? classificationReason;
+  final List<String> relatedFindingIds;
   final String? filePath;
   final int? line;
-  final List<EvidenceReference> evidence;
-  final List<FixSuggestion> suggestions;
-  final double? confidence;
-  final ValidationResult? validation;
   final String source;
-  final String? limitation;
 
-  const DiagnosticIssue({
+  const DiagnosticFinding({
     required this.id,
+    required this.title,
     required this.category,
     required this.severity,
-    required this.title,
-    required this.description,
+    required this.confidence,
+    required this.summary,
+    required this.likelyCause,
+    this.evidence = const <EvidenceReference>[],
+    this.recommendations = const <FixSuggestion>[],
+    this.primaryStatus = PrimaryStatus.unknown,
+    this.classificationReason,
+    this.relatedFindingIds = const <String>[],
     this.filePath,
     this.line,
-    this.evidence = const <EvidenceReference>[],
-    this.suggestions = const <FixSuggestion>[],
-    this.confidence,
-    this.validation,
-    this.source = 'unknown',
-    this.limitation,
+    this.source = 'build_doctor',
   });
+
+  bool get isPrimary => primaryStatus == PrimaryStatus.primary;
+  bool get isCascading => primaryStatus == PrimaryStatus.cascading;
+
+  /// Compatibility alias for description.
+  String get description => summary;
+
+  /// Compatibility alias for suggestions.
+  List<FixSuggestion> get suggestions => recommendations;
+
+  /// Backward-compatibility numeric confidence accessor (1.0 = high, 0.7 = medium, 0.4 = low, 0.0 = unknown).
+  double get confidenceScore => switch (confidence) {
+    DiagnosticConfidence.high => 1.0,
+    DiagnosticConfidence.medium => 0.7,
+    DiagnosticConfidence.low => 0.4,
+    DiagnosticConfidence.unknown => 0.0,
+  };
 
   Map<String, dynamic> toJson() => {
     'id': id,
+    'title': title,
     'category': category.name,
     'severity': severity.name,
-    'title': title,
-    'description': description,
-    'filePath': filePath,
-    'line': line,
-    'evidence': evidence.map((entry) => entry.toJson()).toList(),
-    'suggestions': suggestions.map((entry) => entry.toJson()).toList(),
-    'confidence': confidence,
-    'validation': validation?.toJson(),
+    'confidence': confidence.name,
+    'summary': summary,
+    'likelyCause': likelyCause,
+    'evidence': evidence.map((e) => e.toJson()).toList(),
+    'recommendations': recommendations.map((r) => r.toJson()).toList(),
+    'primaryStatus': primaryStatus.name,
+    if (classificationReason != null)
+      'classificationReason': classificationReason,
+    'relatedFindingIds': relatedFindingIds,
+    if (filePath != null) 'filePath': filePath,
+    if (line != null) 'line': line,
     'source': source,
-    'limitation': limitation,
+    'isPrimary': isPrimary,
   };
 
-  factory DiagnosticIssue.fromJson(Map<String, dynamic> json) {
-    return DiagnosticIssue(
-      id: json['id'] as String? ?? 'unknown_issue',
-      category: DiagnosticCategory.values.byName(
-        json['category'] as String? ?? 'build',
+  factory DiagnosticFinding.fromJson(Map<String, dynamic> json) {
+    return DiagnosticFinding(
+      id: json['id'] as String? ?? 'UNKNOWN_RULE',
+      title: json['title'] as String? ?? 'Unknown Issue',
+      category: DiagnosticCategory.fromString(
+        json['category']?.toString() ?? 'generalBuild',
       ),
-      severity: DiagnosticSeverity.values.byName(
-        json['severity'] as String? ?? 'medium',
+      severity: DiagnosticSeverity.fromString(
+        json['severity']?.toString() ?? 'error',
       ),
-      title: json['title'] as String? ?? 'Unknown issue',
-      description: json['description'] as String? ?? '',
-      filePath: json['filePath'] as String?,
-      line: json['line'] as int?,
+      confidence: DiagnosticConfidence.fromString(
+        json['confidence']?.toString() ?? 'unknown',
+      ),
+      summary:
+          json['summary'] as String? ?? json['description'] as String? ?? '',
+      likelyCause: json['likelyCause'] as String? ?? '',
       evidence: ((json['evidence'] as List?) ?? const [])
           .map(
-            (entry) => EvidenceReference.fromJson(
-              Map<String, dynamic>.from(entry as Map),
-            ),
+            (e) =>
+                EvidenceReference.fromJson(Map<String, dynamic>.from(e as Map)),
           )
           .toList(),
-      suggestions: ((json['suggestions'] as List?) ?? const [])
-          .map(
-            (entry) =>
-                FixSuggestion.fromJson(Map<String, dynamic>.from(entry as Map)),
-          )
+      recommendations:
+          ((json['recommendations'] as List?) ??
+                  (json['suggestions'] as List?) ??
+                  const [])
+              .map(
+                (r) =>
+                    FixSuggestion.fromJson(Map<String, dynamic>.from(r as Map)),
+              )
+              .toList(),
+      primaryStatus: PrimaryStatus.fromString(
+        json['primaryStatus']?.toString() ?? 'unknown',
+      ),
+      classificationReason: json['classificationReason'] as String?,
+      relatedFindingIds: ((json['relatedFindingIds'] as List?) ?? const [])
+          .map((e) => e.toString())
           .toList(),
-      confidence: json['confidence'] as double?,
-      validation: json['validation'] == null
-          ? null
-          : ValidationResult.fromJson(
-              Map<String, dynamic>.from(json['validation'] as Map),
-            ),
-      source: json['source'] as String? ?? 'unknown',
-      limitation: json['limitation'] as String?,
+      filePath: json['filePath'] as String?,
+      line: json['line'] as int?,
+      source: json['source'] as String? ?? 'build_doctor',
     );
   }
 }
 
-/// A collection of diagnostics for a project or session.
+/// Typedef alias for backward compatibility with existing tests/callers.
+typedef DiagnosticIssue = DiagnosticFinding;
+
+/// Comprehensive diagnostic report containing findings, summary, and metadata.
 class DiagnosticReport {
   final String id;
   final DateTime createdAt;
   final String projectName;
-  final List<DiagnosticIssue> issues;
-  final Map<String, dynamic> metrics;
+  final String? projectPath;
+  final String commandName;
+  final String analyzerType;
+  final String analysisStatus;
+  final List<DiagnosticFinding> findings;
+  final List<String> unrecognizedLogLines;
   final List<String> warnings;
+  final List<String> limitations;
   final String toolName;
   final String toolVersion;
   final String schemaVersion;
-  final String? projectPath;
-  final String? commandName;
-  final String? analyzerType;
-  final String? analysisStatus;
   final List<String> analyzedSources;
-  final List<String> limitations;
-  final List<String> skippedAnalyses;
-  final List<String> unavailableAnalyses;
   final int? durationMs;
-  final int? filesAnalyzed;
   final int? rulesExecuted;
 
   const DiagnosticReport({
     required this.id,
     required this.createdAt,
     required this.projectName,
-    this.issues = const <DiagnosticIssue>[],
-    this.metrics = const <String, dynamic>{},
+    this.projectPath,
+    this.commandName = 'build-doctor',
+    this.analyzerType = 'BuildDoctorEngine',
+    this.analysisStatus = 'completed',
+    this.findings = const <DiagnosticFinding>[],
+    this.unrecognizedLogLines = const <String>[],
     this.warnings = const <String>[],
+    this.limitations = const <String>[],
     this.toolName = 'flutter_dev_intelligence',
     this.toolVersion = kPackageVersion,
     this.schemaVersion = '1.0',
-    this.projectPath,
-    this.commandName,
-    this.analyzerType,
-    this.analysisStatus,
     this.analyzedSources = const <String>[],
-    this.limitations = const <String>[],
-    this.skippedAnalyses = const <String>[],
-    this.unavailableAnalyses = const <String>[],
     this.durationMs,
-    this.filesAnalyzed,
     this.rulesExecuted,
   });
 
+  /// Compatibility alias for issues.
+  List<DiagnosticFinding> get issues => findings;
+
+  List<DiagnosticFinding> get primaryFindings =>
+      findings.where((f) => f.primaryStatus == PrimaryStatus.primary).toList();
+
+  List<DiagnosticFinding> get cascadingFindings => findings
+      .where((f) => f.primaryStatus == PrimaryStatus.cascading)
+      .toList();
+
+  List<DiagnosticFinding> get independentFindings => findings
+      .where(
+        (f) =>
+            f.primaryStatus == PrimaryStatus.independent ||
+            f.primaryStatus == PrimaryStatus.unknown,
+      )
+      .toList();
+
   Map<String, int> get severityCounts {
     final counts = <String, int>{};
-    for (final issue in issues) {
-      counts[issue.severity.name] = (counts[issue.severity.name] ?? 0) + 1;
+    for (final finding in findings) {
+      counts[finding.severity.name] = (counts[finding.severity.name] ?? 0) + 1;
     }
     return counts;
   }
 
-  Map<DiagnosticSeverity, List<DiagnosticIssue>> get issuesBySeverity {
-    final grouped = <DiagnosticSeverity, List<DiagnosticIssue>>{};
-    for (final issue in issues) {
-      grouped.putIfAbsent(issue.severity, () => <DiagnosticIssue>[]).add(issue);
-    }
-    return grouped;
-  }
-
-  Map<String, List<DiagnosticIssue>> get issuesBySource {
-    final grouped = <String, List<DiagnosticIssue>>{};
-    for (final issue in issues) {
-      grouped.putIfAbsent(issue.source, () => <DiagnosticIssue>[]).add(issue);
-    }
-    return grouped;
-  }
-
-  Map<DiagnosticCategory, List<DiagnosticIssue>> get issuesByCategory {
-    final grouped = <DiagnosticCategory, List<DiagnosticIssue>>{};
-    for (final issue in issues) {
-      grouped.putIfAbsent(issue.category, () => <DiagnosticIssue>[]).add(issue);
-    }
-    return grouped;
-  }
-
-  Map<String, dynamic> toJson() {
-    final critical = severityCounts['critical'] ?? 0;
-    final high = severityCounts['high'] ?? 0;
-    final medium = severityCounts['medium'] ?? 0;
-    final low = severityCounts['low'] ?? 0;
-    final info = severityCounts['info'] ?? 0;
-    final actionable = critical + high + medium;
-    final status =
-        analysisStatus ??
-        (issues.isEmpty
-            ? 'completed'
-            : (actionable > 0 ? 'actionable' : 'completed'));
-
-    return {
-      'schemaVersion': schemaVersion,
-      'tool': {'name': toolName, 'version': toolVersion},
-      'analysis': {
-        'status': status,
-        if (commandName != null) 'command': commandName,
-        if (analyzerType != null) 'analyzer': analyzerType,
-        if (durationMs != null) 'durationMs': durationMs,
-        if (filesAnalyzed != null) 'filesAnalyzed': filesAnalyzed,
-        if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
-      },
-      'summary': {
-        'critical': critical,
-        'high': high,
-        'medium': medium,
-        'low': low,
-        'info': info,
-        'actionable': actionable,
-        'total': issues.length,
-      },
-      'id': id,
-      'createdAt': createdAt.toIso8601String(),
-      'projectName': projectName,
-      if (projectPath != null) 'projectPath': projectPath,
-      if (commandName != null) 'commandName': commandName,
-      if (analyzerType != null) 'analyzerType': analyzerType,
-      'analysisStatus': status,
-      'issues': issues.map((issue) => issue.toJson()).toList(),
-      'metrics': metrics,
-      'warnings': warnings,
-      'toolName': toolName,
-      'toolVersion': toolVersion,
-      'analyzedSources': analyzedSources,
-      'limitations': limitations,
-      'skippedAnalyses': skippedAnalyses,
-      'unavailableAnalyses': unavailableAnalyses,
-      if (durationMs != null) 'durationMs': durationMs,
-      if (filesAnalyzed != null) 'filesAnalyzed': filesAnalyzed,
-      if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
-      'severityCounts': severityCounts,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+    'schemaVersion': schemaVersion,
+    'tool': {'name': toolName, 'version': toolVersion},
+    'id': id,
+    'createdAt': createdAt.toIso8601String(),
+    'projectName': projectName,
+    if (projectPath != null) 'projectPath': projectPath,
+    'commandName': commandName,
+    'analyzerType': analyzerType,
+    'analysisStatus': analysisStatus,
+    'summary': {
+      'total': findings.length,
+      'primary': primaryFindings.length,
+      'cascading': cascadingFindings.length,
+      'critical': severityCounts['critical'] ?? 0,
+      'error': severityCounts['error'] ?? 0,
+      'warning': severityCounts['warning'] ?? 0,
+      'info': severityCounts['info'] ?? 0,
+    },
+    'findings': findings.map((f) => f.toJson()).toList(),
+    'issues': findings.map((f) => f.toJson()).toList(),
+    'unrecognizedLogLinesCount': unrecognizedLogLines.length,
+    'unrecognizedLogLines': unrecognizedLogLines,
+    'warnings': warnings,
+    'limitations': limitations,
+    'analyzedSources': analyzedSources,
+    if (durationMs != null) 'durationMs': durationMs,
+    if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
+  };
 
   factory DiagnosticReport.fromJson(Map<String, dynamic> json) {
     final toolMap = json['tool'] is Map ? (json['tool'] as Map) : null;
-    final analysisMap = json['analysis'] is Map
-        ? (json['analysis'] as Map)
-        : null;
-
     final name =
         toolMap?['name']?.toString() ??
         json['toolName']?.toString() ??
@@ -373,105 +401,150 @@ class DiagnosticReport {
         json['toolVersion']?.toString() ??
         kPackageVersion;
 
-    final dur =
-        (analysisMap?['durationMs'] as int?) ?? (json['durationMs'] as int?);
-    final files =
-        (analysisMap?['filesAnalyzed'] as int?) ??
-        (json['filesAnalyzed'] as int?);
-    final rules =
-        (analysisMap?['rulesExecuted'] as int?) ??
-        (json['rulesExecuted'] as int?);
-    final cmd =
-        (analysisMap?['command'] as String?) ??
-        (json['commandName'] as String?);
-    final analyzer =
-        (analysisMap?['analyzer'] as String?) ??
-        (json['analyzerType'] as String?);
-    final status =
-        (analysisMap?['status'] as String?) ??
-        (json['analysisStatus'] as String?);
+    final findingsRaw =
+        (json['findings'] as List?) ?? (json['issues'] as List?) ?? const [];
+    final findingsList = findingsRaw
+        .map(
+          (entry) => DiagnosticFinding.fromJson(
+            Map<String, dynamic>.from(entry as Map),
+          ),
+        )
+        .toList();
 
     return DiagnosticReport(
       id: json['id'] as String? ?? 'report',
       createdAt:
           DateTime.tryParse(json['createdAt'] as String? ?? '') ??
           DateTime.now(),
-      projectName: json['projectName'] as String? ?? 'unknown-project',
-      issues: ((json['issues'] as List?) ?? const [])
-          .map(
-            (entry) => DiagnosticIssue.fromJson(
-              Map<String, dynamic>.from(entry as Map),
-            ),
-          )
-          .toList(),
-      metrics: (json['metrics'] as Map? ?? const {}).cast<String, dynamic>(),
+      projectName: json['projectName'] as String? ?? 'flutter-project',
+      projectPath: json['projectPath'] as String?,
+      commandName: json['commandName'] as String? ?? 'build-doctor',
+      analyzerType: json['analyzerType'] as String? ?? 'BuildDoctorEngine',
+      analysisStatus: json['analysisStatus'] as String? ?? 'completed',
+      findings: findingsList,
+      unrecognizedLogLines:
+          ((json['unrecognizedLogLines'] as List?) ?? const [])
+              .map((e) => e.toString())
+              .toList(),
       warnings: ((json['warnings'] as List?) ?? const [])
-          .map((entry) => entry.toString())
+          .map((e) => e.toString())
+          .toList(),
+      limitations: ((json['limitations'] as List?) ?? const [])
+          .map((e) => e.toString())
           .toList(),
       toolName: name,
       toolVersion: version,
       schemaVersion: json['schemaVersion'] as String? ?? '1.0',
-      projectPath: json['projectPath'] as String?,
-      commandName: cmd,
-      analyzerType: analyzer,
-      analysisStatus: status,
       analyzedSources: ((json['analyzedSources'] as List?) ?? const [])
-          .map((entry) => entry.toString())
+          .map((e) => e.toString())
           .toList(),
-      limitations: ((json['limitations'] as List?) ?? const [])
-          .map((entry) => entry.toString())
-          .toList(),
-      skippedAnalyses: ((json['skippedAnalyses'] as List?) ?? const [])
-          .map((entry) => entry.toString())
-          .toList(),
-      unavailableAnalyses: ((json['unavailableAnalyses'] as List?) ?? const [])
-          .map((entry) => entry.toString())
-          .toList(),
-      durationMs: dur,
-      filesAnalyzed: files,
-      rulesExecuted: rules,
+      durationMs: json['durationMs'] as int?,
+      rulesExecuted: json['rulesExecuted'] as int?,
     );
   }
 
   String toMarkdown() {
     final buffer = StringBuffer();
-    buffer.writeln('# $projectName Diagnostic Report');
-    buffer.writeln('Tool: $toolName $toolVersion');
-    if (projectPath != null) {
-      buffer.writeln('Project: $projectPath');
-    }
-    buffer.writeln('Generated: ${createdAt.toIso8601String()}');
-    buffer.writeln('Issues: ${issues.length}');
+    buffer.writeln('# Flutter Dev Intelligence Diagnostic Report');
+    buffer.writeln('**Project:** `$projectName`');
+    buffer.writeln('**Generated:** `${createdAt.toIso8601String()}`');
+    buffer.writeln('**Tool Version:** `$toolName $toolVersion`');
     buffer.writeln();
-    buffer.writeln('## Issues');
-    if (issues.isEmpty) {
-      buffer.writeln('- No issues detected.');
-    } else {
-      for (final issue in issues) {
-        buffer.writeln('- ${issue.title} (${issue.severity.name})');
+
+    buffer.writeln('## Summary');
+    buffer.writeln('- **Total Findings:** ${findings.length}');
+    buffer.writeln('- **Primary Root Causes:** ${primaryFindings.length}');
+    buffer.writeln('- **Cascading Errors:** ${cascadingFindings.length}');
+    buffer.writeln();
+
+    if (primaryFindings.isNotEmpty) {
+      buffer.writeln('## Primary Suspected Issues');
+      for (final finding in primaryFindings) {
+        _writeFindingMarkdown(buffer, finding);
       }
     }
+
+    if (cascadingFindings.isNotEmpty) {
+      buffer.writeln('## Cascading / Secondary Failures');
+      for (final finding in cascadingFindings) {
+        _writeFindingMarkdown(buffer, finding);
+      }
+    }
+
+    if (independentFindings.isNotEmpty &&
+        primaryFindings.isEmpty &&
+        cascadingFindings.isEmpty) {
+      buffer.writeln('## Diagnostic Findings');
+      for (final finding in independentFindings) {
+        _writeFindingMarkdown(buffer, finding);
+      }
+    }
+
+    if (findings.isEmpty) {
+      buffer.writeln('> No build errors or diagnostic issues detected.');
+      buffer.writeln();
+    }
+
+    if (unrecognizedLogLines.isNotEmpty) {
+      buffer.writeln('## Unrecognized Output Summary');
+      buffer.writeln(
+        'The log contained ${unrecognizedLogLines.length} unrecognized lines.',
+      );
+      buffer.writeln();
+    }
+
     if (limitations.isNotEmpty) {
-      buffer.writeln();
       buffer.writeln('## Limitations');
-      for (final limitation in limitations) {
-        buffer.writeln('- $limitation');
+      for (final lim in limitations) {
+        buffer.writeln('- $lim');
       }
-    }
-    if (skippedAnalyses.isNotEmpty) {
       buffer.writeln();
-      buffer.writeln('## Skipped Analyses');
-      for (final analysis in skippedAnalyses) {
-        buffer.writeln('- $analysis');
-      }
     }
-    if (unavailableAnalyses.isNotEmpty) {
-      buffer.writeln();
-      buffer.writeln('## Unavailable Analyses');
-      for (final analysis in unavailableAnalyses) {
-        buffer.writeln('- $analysis');
-      }
-    }
+
     return buffer.toString();
+  }
+
+  static void _writeFindingMarkdown(
+    StringBuffer buffer,
+    DiagnosticFinding finding,
+  ) {
+    buffer.writeln('### ${finding.title}');
+    buffer.writeln('- **Rule ID:** `${finding.id}`');
+    buffer.writeln('- **Category:** ${finding.category.displayName}');
+    buffer.writeln('- **Severity:** ${finding.severity.name.toUpperCase()}');
+    buffer.writeln(
+      '- **Confidence:** ${finding.confidence.name.toUpperCase()}',
+    );
+    if (finding.classificationReason != null) {
+      buffer.writeln(
+        '- **Classification:** ${finding.primaryStatus.name} (${finding.classificationReason})',
+      );
+    }
+    buffer.writeln();
+    buffer.writeln('**Summary:** ${finding.summary}');
+    buffer.writeln();
+    buffer.writeln('**Likely Cause:** ${finding.likelyCause}');
+    buffer.writeln();
+
+    if (finding.evidence.isNotEmpty) {
+      buffer.writeln('**Evidence:**');
+      for (final ev in finding.evidence) {
+        buffer.writeln('```text');
+        buffer.writeln('${ev.label}: ${ev.value}');
+        buffer.writeln('```');
+      }
+      buffer.writeln();
+    }
+
+    if (finding.recommendations.isNotEmpty) {
+      buffer.writeln('**Recommended Actions:**');
+      for (var i = 0; i < finding.recommendations.length; i++) {
+        final rec = finding.recommendations[i];
+        buffer.writeln(
+          '${i + 1}. ${rec.action}${rec.details.isNotEmpty ? " - ${rec.details}" : ""}',
+        );
+      }
+      buffer.writeln();
+    }
   }
 }
