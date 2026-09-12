@@ -2,7 +2,7 @@ name: flutter_dev_intelligence
 description: >-
   Evidence-based Flutter developer diagnostics toolkit for build issues,
   UI quality checks, and runtime performance investigation.
-version: 1.0.0
+version: 1.0.1
 homepage: https://github.com/Chinmay2237/flutter_dev_intelligence
 repository: https://github.com/Chinmay2237/flutter_dev_intelligence
 issue_tracker: https://github.com/Chinmay2237/flutter_dev_intelligence/issues

@@ -1,3 +1,8 @@
+## 1.0.1
+
+### Fixes
+* **CLI Executable Entry Point**: Fixed executable configuration by renaming CLI entry point to `bin/flutter_dev_intelligence.dart` and declaring `flutter_dev_intelligence: flutter_dev_intelligence` in `pubspec.yaml`, enabling standard resolution via `dart run flutter_dev_intelligence doctor`.
+
 ## 1.0.0
 
 ### Production Release (Stable)
