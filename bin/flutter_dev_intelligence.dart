@@ -22,12 +22,14 @@ Future<void> main(List<String> arguments) async {
       return;
 
     case 'doctor':
+    case 'doc':
       exitCode = await _runDoctor(arguments.skip(1).toList());
       return;
 
     case 'build-doctor':
     case 'build':
-      final args = command == 'build'
+    case 'build_doctor':
+      final args = (command == 'build' || command == 'build_doctor')
           ? (arguments.length > 1 && arguments[1] == 'doctor'
                 ? arguments.skip(2).toList()
                 : arguments.skip(1).toList())
@@ -37,7 +39,8 @@ Future<void> main(List<String> arguments) async {
 
     case 'ui-doctor':
     case 'ui':
-      final args = command == 'ui'
+    case 'ui_doctor':
+      final args = (command == 'ui' || command == 'ui_doctor')
           ? (arguments.length > 1 && arguments[1] == 'doctor'
                 ? arguments.skip(2).toList()
                 : arguments.skip(1).toList())
@@ -47,7 +50,14 @@ Future<void> main(List<String> arguments) async {
 
     case 'performance':
     case 'perf':
-      final args = command == 'perf'
+    case 'perf-investigator':
+    case 'perf_investigator':
+    case 'performance_investigator':
+      final args =
+          (command == 'perf' ||
+              command == 'perf-investigator' ||
+              command == 'perf_investigator' ||
+              command == 'performance_investigator')
           ? (arguments.length > 1 && arguments[1] == 'doctor'
                 ? arguments.skip(2).toList()
                 : arguments.skip(1).toList())
@@ -56,11 +66,13 @@ Future<void> main(List<String> arguments) async {
       return;
 
     default:
-      if (!command.startsWith('-')) {
-        // Fallback for single path positional argument: `flutter-dev ./path`
+      if (!command.startsWith('-') && Directory(command).existsSync()) {
         exitCode = await _runDoctor(arguments);
       } else {
-        _printHelp();
+        stderr.writeln("Error: Unknown command '$command'.");
+        stderr.writeln(
+          "Run 'flutter_dev_intelligence --help' for available commands.",
+        );
         exitCode = 2;
       }
       return;
@@ -178,7 +190,10 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
   }
 
   try {
-    final rawIssues = BuildLogParser.parse(logContent);
+    final rawIssues = BuildLogParser.parse(
+      logContent,
+      maxLogSizeBytes: configValidation.config.maxLogSizeBytes,
+    );
     final issues = DiagnosticFilter.filterIssues(
       rawIssues,
       configValidation.config,
@@ -190,9 +205,16 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
       createdAt: DateTime.now(),
       projectName: projectName,
       projectPath: options.projectPath,
+      commandName: 'build-doctor',
+      analyzerType: 'BuildLogParser',
+      rulesExecuted: 41,
       issues: issues,
       analyzedSources: [sourceLabel],
-      rulesExecuted: 41,
+      skippedAnalyses: const [
+        'project health',
+        'static UI analysis',
+        'performance trace analysis',
+      ],
       limitations: const [
         'Build analysis evaluates supplied logs and does not execute the build itself.',
       ],
@@ -212,17 +234,7 @@ Future<int> _runUiDoctor(List<String> arguments) async {
 
   if (options.useStdin) {
     stderr.writeln('Error: The ui-doctor command does not support --stdin.');
-    stderr.writeln('Use --project <directory> instead.');
-    return 2;
-  }
-
-  final libDir = Directory(
-    '${options.projectPath}${Platform.pathSeparator}lib',
-  );
-  if (!await libDir.exists()) {
-    stderr.writeln(
-      'Error: Lib directory not found for static UI analysis: ${libDir.path}',
-    );
+    stderr.writeln('Use --project <directory> or --file <path> instead.');
     return 2;
   }
 
@@ -239,10 +251,34 @@ Future<int> _runUiDoctor(List<String> arguments) async {
   }
 
   try {
-    final results = await UiAstAnalyzer.analyzeDirectory(
-      libDir.path,
-      config: configValidation.config,
-    );
+    List<UiAstAnalysisResult> results;
+    if (options.filePath != null) {
+      final file = File(options.filePath!);
+      if (!await file.exists()) {
+        stderr.writeln('Error: Source file not found: ${options.filePath}');
+        return 2;
+      }
+      final res = await UiAstAnalyzer.analyzeFile(
+        options.filePath!,
+        config: configValidation.config,
+      );
+      results = [res];
+    } else {
+      final libDir = Directory(
+        '${options.projectPath}${Platform.pathSeparator}lib',
+      );
+      if (!await libDir.exists()) {
+        stderr.writeln(
+          'Error: Lib directory not found for static UI analysis: ${libDir.path}',
+        );
+        return 2;
+      }
+      results = await UiAstAnalyzer.analyzeDirectory(
+        libDir.path,
+        config: configValidation.config,
+      );
+    }
+
     final rawIssues = results.expand((r) => r.issues).toList();
     final issues = DiagnosticFilter.filterIssues(
       rawIssues,
@@ -255,10 +291,17 @@ Future<int> _runUiDoctor(List<String> arguments) async {
       createdAt: DateTime.now(),
       projectName: projectName,
       projectPath: options.projectPath,
+      commandName: 'ui-doctor',
+      analyzerType: 'UiAstAnalyzer',
+      rulesExecuted: 17,
       issues: issues,
       analyzedSources: results.map((r) => r.filePath).toList(),
       filesAnalyzed: results.length,
-      rulesExecuted: 17,
+      skippedAnalyses: const [
+        'project health',
+        'build log analysis',
+        'performance trace analysis',
+      ],
       limitations: const [
         'Static UI findings are based on Dart AST source analysis. Runtime layout behavior is not executed.',
       ],
@@ -277,7 +320,7 @@ Future<int> _runPerformance(List<String> arguments) async {
   if (options.errorExitCode != null) return options.errorExitCode!;
 
   if (options.useStdin && options.inputPath != null) {
-    stderr.writeln('Error: Cannot combine --stdin and --input.');
+    stderr.writeln('Error: Cannot combine --stdin and --input/--trace.');
     return 2;
   }
 
@@ -315,7 +358,16 @@ Future<int> _runPerformance(List<String> arguments) async {
     sourceLabel = options.inputPath!;
   } else {
     stderr.writeln(
-      'Error: Performance doctor requires --input <trace.json> or --stdin.',
+      'Error: Performance doctor requires --input <trace.json>, --trace <trace.json>, or --stdin.',
+    );
+    stderr.writeln('No performance trace data was supplied.');
+    stderr.writeln();
+    stderr.writeln('Usage:');
+    stderr.writeln(
+      '  flutter_dev_intelligence performance --input <trace.json>',
+    );
+    stderr.writeln(
+      '  cat devtools_trace.json | flutter_dev_intelligence performance --stdin',
     );
     return 2;
   }
@@ -347,14 +399,21 @@ Future<int> _runPerformance(List<String> arguments) async {
       createdAt: DateTime.now(),
       projectName: projectName,
       projectPath: options.projectPath,
+      commandName: 'performance',
+      analyzerType: 'PerformanceInputParser',
+      rulesExecuted: 5,
       issues: issues,
       metrics: summary.toJson(),
       analyzedSources: [sourceLabel],
-      rulesExecuted: 5,
+      skippedAnalyses: const [
+        'project health',
+        'static UI analysis',
+        'build log analysis',
+      ],
       warnings: parseResult.warnings,
       limitations: parseResult.limitations.isEmpty
           ? const [
-              'Performance analysis requires a supported frame trace. This command does not automatically profile a running application.',
+              'Performance analysis evaluates frame duration traces. This command does not profile live running applications.',
             ]
           : parseResult.limitations,
     );
@@ -379,6 +438,7 @@ Future<String> _readStdin() async {
 class _CliOptions {
   _CliOptions({
     required this.projectPath,
+    this.filePath,
     this.configPath,
     this.logPath,
     this.inputPath,
@@ -400,6 +460,7 @@ class _CliOptions {
   });
 
   final String projectPath;
+  final String? filePath;
   final String? configPath;
   final String? logPath;
   final String? inputPath;
@@ -422,6 +483,7 @@ class _CliOptions {
 
 _CliOptions _parseCommonArgs(List<String> arguments) {
   var projectPath = Directory.current.path;
+  String? filePath;
   String? configPath;
   String? logPath;
   String? inputPath;
@@ -441,35 +503,58 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
   int? maxIssues;
 
   for (var index = 0; index < arguments.length; index += 1) {
-    final argument = arguments[index];
+    final rawArg = arguments[index];
+    String flag;
     String? value;
-    if (argument == '--project' ||
-        argument == '--config' ||
-        argument == '--log' ||
-        argument == '--input' ||
-        argument == '--format' ||
-        argument == '--output' ||
-        argument == '--color' ||
-        argument == '--severity-threshold' ||
-        argument == '--confidence-threshold' ||
-        argument == '--rule' ||
-        argument == '--category' ||
-        argument == '--exclude' ||
-        argument == '--max-issues') {
+
+    if (rawArg.startsWith('--') && rawArg.contains('=')) {
+      final eqIndex = rawArg.indexOf('=');
+      flag = rawArg.substring(0, eqIndex);
+      value = rawArg.substring(eqIndex + 1);
+    } else {
+      flag = rawArg;
+    }
+
+    const valueFlags = {
+      '--project',
+      '--file',
+      '--config',
+      '--log',
+      '--input',
+      '--trace',
+      '--format',
+      '--output',
+      '--color',
+      '--severity-threshold',
+      '--confidence-threshold',
+      '--rule',
+      '--category',
+      '--exclude',
+      '--max-issues',
+    };
+
+    if (valueFlags.contains(flag) && value == null) {
       if (index + 1 >= arguments.length) {
-        stderr.writeln('Error: Missing value for $argument.');
+        stderr.writeln('Error: Missing value for $flag.');
         return _CliOptions(projectPath: projectPath, errorExitCode: 2);
       }
       value = arguments[++index];
     }
 
-    switch (argument) {
+    switch (flag) {
       case '--help':
       case '-h':
         _printHelp();
         return _CliOptions(projectPath: projectPath, errorExitCode: 0);
+      case '--version':
+      case '-v':
+        stdout.writeln('flutter_dev_intelligence $kPackageVersion');
+        return _CliOptions(projectPath: projectPath, errorExitCode: 0);
       case '--project':
         projectPath = value!;
+        break;
+      case '--file':
+        filePath = value!;
         break;
       case '--config':
         configPath = value!;
@@ -478,6 +563,7 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
         logPath = value!;
         break;
       case '--input':
+      case '--trace':
         inputPath = value!;
         break;
       case '--format':
@@ -577,10 +663,11 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
         maxIssues = parsed;
         break;
       default:
-        if (!argument.startsWith('-') && arguments.length == 1) {
-          projectPath = argument;
+        if (!flag.startsWith('-') &&
+            (arguments.length == 1 || projectPath == Directory.current.path)) {
+          projectPath = flag;
         } else {
-          stderr.writeln('Error: Unknown option: $argument');
+          stderr.writeln('Error: Unknown option: $flag');
           return _CliOptions(projectPath: projectPath, errorExitCode: 2);
         }
     }
@@ -600,6 +687,7 @@ _CliOptions _parseCommonArgs(List<String> arguments) {
 
   return _CliOptions(
     projectPath: projectPath,
+    filePath: filePath,
     configPath: configPath,
     logPath: logPath,
     inputPath: inputPath,
@@ -686,6 +774,9 @@ Future<int> _renderAndOutput(
     createdAt: initialReport.createdAt,
     projectName: initialReport.projectName,
     projectPath: initialReport.projectPath,
+    commandName: commandName ?? initialReport.commandName,
+    analyzerType: initialReport.analyzerType,
+    analysisStatus: initialReport.analysisStatus,
     issues: filteredIssues,
     metrics: initialReport.metrics,
     warnings: initialReport.warnings,
@@ -759,16 +850,16 @@ void _printHelp() {
   stdout.writeln('');
   stdout.writeln('Commands:');
   stdout.writeln(
-    '  doctor          Run project-wide diagnostics (pubspec, lockfile, static UI, logs)',
+    '  doctor          Inspect project structure, pubspec, lockfile, and SDK environment health (aliases: doc)',
   );
   stdout.writeln(
-    '  build-doctor    Analyze Flutter/Dart build logs (--log <path> or --stdin)',
+    '  ui-doctor       Analyze static Flutter Dart AST UI layout heuristics (--project <path> or --file <path>) (aliases: ui, ui_doctor)',
   );
   stdout.writeln(
-    '  ui-doctor       Analyze static Flutter Dart AST UI layout heuristics (--project <path>)',
+    '  build-doctor    Analyze Flutter/Dart/Android/iOS build logs (--log <path> or --stdin) (aliases: build, build_doctor)',
   );
   stdout.writeln(
-    '  performance     Analyze performance frame timing trace data (--input <trace.json> or --stdin)',
+    '  performance     Analyze frame timing traces and DevTools Chrome traces (--input <trace.json>, --trace <trace.json>, or --stdin) (aliases: perf, perf-investigator, perf_investigator)',
   );
   stdout.writeln('');
   stdout.writeln('Options:');
@@ -776,11 +867,16 @@ void _printHelp() {
     '  --project <path>               Project root directory (default: current directory)',
   );
   stdout.writeln(
+    '  --file <path>                  Single Dart source file to analyze (ui-doctor)',
+  );
+  stdout.writeln(
     '  --config <path>                Configuration file path (default: flutter_dev_intelligence.yaml)',
   );
-  stdout.writeln('  --log <path>                   Build log file path');
   stdout.writeln(
-    '  --input <path>                 Trace / metrics JSON file path',
+    '  --log <path>                   Build log file path (build-doctor)',
+  );
+  stdout.writeln(
+    '  --input <path>, --trace <path> Trace / metrics JSON file path (performance)',
   );
   stdout.writeln(
     '  --stdin                        Read log or trace input from standard input pipe',
@@ -831,15 +927,15 @@ void _printHelp() {
   stdout.writeln('Examples:');
   stdout.writeln('  dart run flutter_dev_intelligence doctor --project .');
   stdout.writeln(
-    '  dart run flutter_dev_intelligence doctor --config custom_config.yaml',
+    '  dart run flutter_dev_intelligence ui-doctor --project=. --format=json',
   );
   stdout.writeln(
-    '  flutter analyze 2>&1 | dart run flutter_dev_intelligence build-doctor --stdin',
+    '  dart run flutter_dev_intelligence build-doctor --log=android_build.log',
   );
   stdout.writeln(
     '  cat trace.json | dart run flutter_dev_intelligence performance --stdin',
   );
   stdout.writeln(
-    '  dart run flutter_dev_intelligence ui-doctor --format json --output report.json',
+    '  dart run flutter_dev_intelligence perf-investigator --trace=devtools_trace.json',
   );
 }

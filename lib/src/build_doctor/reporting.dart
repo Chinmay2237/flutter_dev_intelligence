@@ -71,8 +71,12 @@ class DiagnosticReportRenderer {
     buffer.writeln(dim(divider));
 
     // Project Metadata
-    if (commandName != null && commandName.isNotEmpty) {
-      buffer.writeln('${bold('Command:')}     $commandName');
+    final cmd = commandName ?? report.commandName;
+    if (cmd != null && cmd.isNotEmpty) {
+      buffer.writeln('${bold('Command:')}     $cmd');
+    }
+    if (report.analyzerType != null && report.analyzerType!.isNotEmpty) {
+      buffer.writeln('${bold('Analyzer:')}    ${report.analyzerType}');
     }
     buffer.writeln('${bold('Project:')}     ${report.projectName}');
     if (report.durationMs != null) {
@@ -83,6 +87,11 @@ class DiagnosticReportRenderer {
     }
     if (report.rulesExecuted != null) {
       buffer.writeln('${bold('Rules executed:')} ${report.rulesExecuted}');
+    }
+    if (report.analyzedSources.isNotEmpty) {
+      buffer.writeln(
+        '${bold('Sources:')}     ${report.analyzedSources.join(', ')}',
+      );
     }
     buffer.writeln();
 
@@ -244,6 +253,12 @@ class DiagnosticReportRenderer {
     buffer.writeln();
     buffer.writeln('| Property | Value |');
     buffer.writeln('|---|---|');
+    if (report.commandName != null && report.commandName!.isNotEmpty) {
+      buffer.writeln('| Command | `${report.commandName}` |');
+    }
+    if (report.analyzerType != null && report.analyzerType!.isNotEmpty) {
+      buffer.writeln('| Analyzer | `${report.analyzerType}` |');
+    }
     buffer.writeln('| Project | `${report.projectName}` |');
     if (report.projectPath != null) {
       buffer.writeln('| Path | `${report.projectPath}` |');
@@ -258,6 +273,9 @@ class DiagnosticReportRenderer {
     }
     if (report.rulesExecuted != null) {
       buffer.writeln('| Rules Executed | ${report.rulesExecuted} |');
+    }
+    if (report.analyzedSources.isNotEmpty) {
+      buffer.writeln('| Sources | `${report.analyzedSources.join(', ')}` |');
     }
     buffer.writeln();
 

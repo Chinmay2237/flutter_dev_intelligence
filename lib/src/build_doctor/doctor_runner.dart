@@ -14,11 +14,13 @@ class DoctorOptions {
     required this.projectPath,
     this.logPath,
     this.configPath,
+    this.includeUiDoctor = false,
   });
 
   final String projectPath;
   final String? logPath;
   final String? configPath;
+  final bool includeUiDoctor;
 }
 
 /// Runs all available project-level diagnostics and combines their evidence.
@@ -90,7 +92,9 @@ class DoctorRunner {
     }
     warnings.addAll(lockfile.warnings);
 
-    if (scan.libFolderExists && effectiveConfig.enableUiDoctor) {
+    if (options.includeUiDoctor &&
+        scan.libFolderExists &&
+        effectiveConfig.enableUiDoctor) {
       final uiResults = await UiAstAnalyzer.analyzeDirectory(
         '${scan.path}${Platform.pathSeparator}lib',
         config: effectiveConfig,
@@ -144,6 +148,8 @@ class DoctorRunner {
       }
     }
 
+    skipped.add('performance trace analysis');
+
     unavailable.add(
       'AI explanation provider: disabled (no AI provider configured; deterministic analysis is active).',
     );
@@ -164,6 +170,9 @@ class DoctorRunner {
                   : basename;
             }(),
       projectPath: options.projectPath,
+      commandName: 'doctor',
+      analyzerType: 'DoctorRunner',
+      rulesExecuted: 10,
       issues: issues,
       metrics: <String, dynamic>{
         'dependency_count': pubspec.dependencies.length,
@@ -174,7 +183,7 @@ class DoctorRunner {
       analyzedSources: sources,
       limitations: const <String>[
         'Runtime frame timing requires execution inside a Flutter application and was not measured by this CLI run.',
-        'Static UI findings are based on Dart AST source analysis. Runtime layout behavior is not executed.',
+        'Static UI findings are evaluated by the ui-doctor command.',
       ],
       skippedAnalyses: skipped,
       unavailableAnalyses: unavailable,

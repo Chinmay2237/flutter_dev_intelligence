@@ -236,6 +236,9 @@ class DiagnosticReport {
   final String toolVersion;
   final String schemaVersion;
   final String? projectPath;
+  final String? commandName;
+  final String? analyzerType;
+  final String? analysisStatus;
   final List<String> analyzedSources;
   final List<String> limitations;
   final List<String> skippedAnalyses;
@@ -255,6 +258,9 @@ class DiagnosticReport {
     this.toolVersion = kPackageVersion,
     this.schemaVersion = '1.0',
     this.projectPath,
+    this.commandName,
+    this.analyzerType,
+    this.analysisStatus,
     this.analyzedSources = const <String>[],
     this.limitations = const <String>[],
     this.skippedAnalyses = const <String>[],
@@ -303,14 +309,19 @@ class DiagnosticReport {
     final low = severityCounts['low'] ?? 0;
     final info = severityCounts['info'] ?? 0;
     final actionable = critical + high + medium;
+    final status =
+        analysisStatus ??
+        (issues.isEmpty
+            ? 'completed'
+            : (actionable > 0 ? 'actionable' : 'completed'));
 
     return {
       'schemaVersion': schemaVersion,
       'tool': {'name': toolName, 'version': toolVersion},
       'analysis': {
-        'status': issues.isEmpty
-            ? 'completed'
-            : (actionable > 0 ? 'actionable' : 'completed'),
+        'status': status,
+        if (commandName != null) 'command': commandName,
+        if (analyzerType != null) 'analyzer': analyzerType,
         if (durationMs != null) 'durationMs': durationMs,
         if (filesAnalyzed != null) 'filesAnalyzed': filesAnalyzed,
         if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
@@ -328,6 +339,9 @@ class DiagnosticReport {
       'createdAt': createdAt.toIso8601String(),
       'projectName': projectName,
       if (projectPath != null) 'projectPath': projectPath,
+      if (commandName != null) 'commandName': commandName,
+      if (analyzerType != null) 'analyzerType': analyzerType,
+      'analysisStatus': status,
       'issues': issues.map((issue) => issue.toJson()).toList(),
       'metrics': metrics,
       'warnings': warnings,
@@ -367,6 +381,15 @@ class DiagnosticReport {
     final rules =
         (analysisMap?['rulesExecuted'] as int?) ??
         (json['rulesExecuted'] as int?);
+    final cmd =
+        (analysisMap?['command'] as String?) ??
+        (json['commandName'] as String?);
+    final analyzer =
+        (analysisMap?['analyzer'] as String?) ??
+        (json['analyzerType'] as String?);
+    final status =
+        (analysisMap?['status'] as String?) ??
+        (json['analysisStatus'] as String?);
 
     return DiagnosticReport(
       id: json['id'] as String? ?? 'report',
@@ -389,6 +412,9 @@ class DiagnosticReport {
       toolVersion: version,
       schemaVersion: json['schemaVersion'] as String? ?? '1.0',
       projectPath: json['projectPath'] as String?,
+      commandName: cmd,
+      analyzerType: analyzer,
+      analysisStatus: status,
       analyzedSources: ((json['analyzedSources'] as List?) ?? const [])
           .map((entry) => entry.toString())
           .toList(),

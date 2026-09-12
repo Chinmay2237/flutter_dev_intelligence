@@ -538,7 +538,7 @@ Widget buildWidget() => ListView(
 ''');
 
       final report = await DoctorRunner.run(
-        DoctorOptions(projectPath: dir.path),
+        DoctorOptions(projectPath: dir.path, includeUiDoctor: true),
       );
 
       expect(report.analyzedSources, contains('static UI'));

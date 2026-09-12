@@ -314,7 +314,7 @@ void main() {
         expect(process.exitCode, 2);
         expect(
           process.stdout.toString() + process.stderr.toString(),
-          contains('Flutter Dev Intelligence'),
+          contains('Unknown command'),
         );
       },
     );
