@@ -1,7 +1,7 @@
 export 'project_config.dart';
 
 /// Package version constant for flutter_dev_intelligence.
-const String kPackageVersion = '1.0.1';
+const String kPackageVersion = '1.0.2';
 
 /// Immutable runtime configuration for Flutter Dev Intelligence.
 class DevIntelligenceConfig {

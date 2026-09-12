@@ -222,3 +222,10 @@ Use standard shell exit codes (`0` clean, `1` issues/error) in CI pipelines:
 - [Security Guidelines](SECURITY.md)
 - [Changelog](CHANGELOG.md)
 - [License (MIT)](LICENSE)
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

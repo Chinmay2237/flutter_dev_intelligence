@@ -21,3 +21,5 @@ example/build/
 *.log
 .buildlog/
 PHASE_*
+docs/
+

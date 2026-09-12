@@ -1,3 +1,12 @@
+## 1.0.2
+
+- Improved CLI command routing and analyzer dispatch (`doctor`, `ui-doctor`, `build-doctor`, `performance`).
+- Added strict input validation for build and performance commands to prevent generic report fallbacks on missing input.
+- Enhanced diagnostic report metadata and output consistency across Terminal, JSON, and Markdown formats.
+- Fixed CLI option parser to support both space-separated and `--flag=value` key-value syntax.
+- Fixed issue where different CLI commands could produce identical output.
+- Updated package metadata URLs and verified MIT license detection for pub.dev/pana scoring.
+
 ## 1.0.1
 
 ### Fixes
