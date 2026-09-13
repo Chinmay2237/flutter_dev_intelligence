@@ -62,11 +62,11 @@ class UiDoctorEngine {
 
     final rawFindings = <DiagnosticFinding>[];
     final analyzedSources = <String>[];
-    var rulesExecutedCount = 0;
+    var ruleEvaluationsCount = 0;
 
     // 1. Run project-level analysis rules (pubspec & filesystem assets)
     for (final rule in rulesToRun) {
-      rulesExecutedCount++;
+      ruleEvaluationsCount++;
       final findings = rule.analyzeProject(
         projectPath: absoluteProjectPath,
         pubspecResult: pubspecResult,
@@ -100,7 +100,7 @@ class UiDoctorEngine {
           final ast = parseResult.unit;
 
           for (final rule in rulesToRun) {
-            rulesExecutedCount++;
+            ruleEvaluationsCount++;
             final findings = rule.analyzeDartFile(
               filePath: file.path,
               relativePath: relPath,
@@ -189,7 +189,9 @@ class UiDoctorEngine {
       findings: filteredFindings,
       analyzedSources: analyzedSources,
       durationMs: stopwatch.elapsedMilliseconds,
-      rulesExecuted: rulesExecutedCount,
+      rulesExecuted: rulesToRun.length,
+      filesScanned: analyzedSources.length,
+      ruleEvaluations: ruleEvaluationsCount,
       baseline: baselineComparison,
     );
   }

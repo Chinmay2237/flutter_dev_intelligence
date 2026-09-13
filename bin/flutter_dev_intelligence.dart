@@ -101,6 +101,7 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
 
   try {
     final projectName = await _resolveProjectName(options.projectPath);
+    final configResult = await ProjectConfig.findAndLoad(options.projectPath);
 
     final report = await BuildDoctorEngine.analyze(
       options: BuildDoctorEngineOptions(
@@ -109,6 +110,7 @@ Future<int> _runBuildDoctor(List<String> arguments) async {
         projectName: projectName,
         projectPath: options.projectPath,
         redactSecrets: !options.noRedact,
+        config: configResult.config,
       ),
     );
 

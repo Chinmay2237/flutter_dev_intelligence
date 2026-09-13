@@ -12,7 +12,7 @@
 * 🎯 **Primary Root-Cause Prioritization**: Distinguishes the primary root cause from downstream cascading failures (such as `BUILD FAILED` or `:compileDebugJavaWithJavac FAILED`).
 * 🔎 **Evidence-Backed Findings**: Every finding includes exact log references, context lines, and defensible confidence levels.
 * 🔒 **Offline & Local-First**: Performs 100% deterministic analysis locally. Automatically redacts secrets, tokens, private keys, and user home directory paths.
-* 📦 **Zero Heavy Dependencies**: Lightweight design without heavy AST parsers or network dependencies.
+* ⚡ **Pure Dart & Offline-First**: Built with Dart and designed for offline-first diagnostics. Uses the Dart analyzer for source-level UI analysis without network access, cloud processing, AI services, or telemetry.
 * 📄 **Multi-Format Output**: Renders scannable reports in **Terminal** (with color/ASCII options), **JSON** (machine-readable), and **Markdown** (ideal for GitHub Actions and issue comments).
 
 ---

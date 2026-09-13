@@ -1,3 +1,8 @@
+import 'package:test/test.dart';
+
 void main() {
-  print("This print statement is inside a test file and should be excluded");
+  test('Sample widget test fixture', () {
+    expect(1 + 1, equals(2));
+  });
 }
+

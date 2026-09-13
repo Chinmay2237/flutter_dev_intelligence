@@ -22,4 +22,6 @@ example/build/
 .buildlog/
 PHASE_*
 docs/
+test/fixtures/
+
 

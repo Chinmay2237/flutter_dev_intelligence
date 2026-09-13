@@ -369,6 +369,8 @@ class DiagnosticReport {
   final List<String> analyzedSources;
   final int? durationMs;
   final int? rulesExecuted;
+  final int? filesScanned;
+  final int? ruleEvaluations;
   final BaselineComparison? baseline;
 
   const DiagnosticReport({
@@ -389,6 +391,8 @@ class DiagnosticReport {
     this.analyzedSources = const <String>[],
     this.durationMs,
     this.rulesExecuted,
+    this.filesScanned,
+    this.ruleEvaluations,
     this.baseline,
   });
 
@@ -446,6 +450,8 @@ class DiagnosticReport {
     'analyzedSources': analyzedSources,
     if (durationMs != null) 'durationMs': durationMs,
     if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
+    if (filesScanned != null) 'filesScanned': filesScanned,
+    if (ruleEvaluations != null) 'ruleEvaluations': ruleEvaluations,
     if (baseline != null) 'baseline': baseline!.toJson(),
   };
 
@@ -504,6 +510,8 @@ class DiagnosticReport {
           .toList(),
       durationMs: json['durationMs'] as int?,
       rulesExecuted: json['rulesExecuted'] as int?,
+      filesScanned: json['filesScanned'] as int?,
+      ruleEvaluations: json['ruleEvaluations'] as int?,
       baseline: baselineComp,
     );
   }

@@ -1,4 +1,5 @@
 import '../core/models.dart';
+import '../core/project_config.dart';
 import 'input_loader.dart';
 import 'log_normalizer.dart';
 import 'log_parser.dart';
@@ -14,6 +15,7 @@ class BuildDoctorEngineOptions {
   final bool redactSecrets;
   final int maxLogSizeBytes;
   final List<DiagnosticRule>? customRules;
+  final ProjectConfig? config;
 
   const BuildDoctorEngineOptions({
     this.logPath,
@@ -23,6 +25,7 @@ class BuildDoctorEngineOptions {
     this.redactSecrets = true,
     this.maxLogSizeBytes = 10485760,
     this.customRules,
+    this.config,
   });
 }
 
@@ -70,9 +73,20 @@ class BuildDoctorEngine {
     // 5. Root Cause Classification (Primary vs Cascading)
     final classifiedFindings = RootCauseClassifier.classify(rawFindings);
 
+    // 6. Apply Project Configuration Filters and Suppressions
+    ProjectConfig? effectiveConfig = options.config;
+    if (effectiveConfig == null && options.projectPath != null && options.projectPath!.isNotEmpty) {
+      final configResult = await ProjectConfig.findAndLoad(options.projectPath!);
+      effectiveConfig = configResult.config;
+    }
+
+    final filteredFindings = effectiveConfig != null
+        ? DiagnosticFilter.filterIssues(classifiedFindings, effectiveConfig)
+        : classifiedFindings;
+
     final durationMs = DateTime.now().difference(startTime).inMilliseconds;
 
-    // 6. Report Generation
+    // 7. Report Generation
     final reportId = 'build_doctor_${DateTime.now().microsecondsSinceEpoch}';
 
     return DiagnosticReport(
@@ -82,8 +96,8 @@ class BuildDoctorEngine {
       projectPath: options.projectPath,
       commandName: 'build-doctor',
       analyzerType: 'BuildDoctorEngine',
-      analysisStatus: classifiedFindings.isEmpty ? 'completed' : 'actionable',
-      findings: classifiedFindings,
+      analysisStatus: filteredFindings.isEmpty ? 'completed' : 'actionable',
+      findings: filteredFindings,
       unrecognizedLogLines: parsed.unrecognizedLines,
       analyzedSources: [input.sourceLabel],
       limitations: input.isTruncated
@@ -99,3 +113,4 @@ class BuildDoctorEngine {
     );
   }
 }
+
