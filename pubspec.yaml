@@ -2,7 +2,7 @@ name: flutter_dev_intelligence
 description: >-
   Offline-first diagnostic toolkit that analyzes Flutter and Dart build logs,
   identifies root causes, separates cascading failures, and generates evidence-backed debugging reports.
-version: 1.2.0
+version: 1.2.1
 homepage: https://pub.dev/packages/flutter_dev_intelligence
 repository: https://github.com/Chinmay2237/flutter_dev_intelligence
 issue_tracker: https://github.com/Chinmay2237/flutter_dev_intelligence/issues
