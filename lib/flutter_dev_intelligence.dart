@@ -15,6 +15,7 @@ export 'src/build_doctor/rule_matcher.dart';
 export 'src/build_doctor/root_cause_classifier.dart';
 export 'src/build_doctor/pubspec_analyzer.dart';
 export 'src/build_doctor/reporting.dart';
+export 'src/ui_doctor/ui_doctor.dart';
 
 /// Main package entrypoint for Flutter Dev Intelligence.
 class FlutterDevIntelligence {

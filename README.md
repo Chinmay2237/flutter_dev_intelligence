@@ -55,6 +55,42 @@ dart run flutter_dev_intelligence build-doctor --log build.log --format markdown
 
 ---
 
+## UI Doctor (Static UI/UX & Code Health Inspector)
+
+`UI Doctor` statically inspects Flutter source code and asset declarations to detect potential code smells, maintainability concerns, asset errors, and accessibility issues.
+
+> **Disclaimer**: UI Doctor performs offline static heuristic analysis. Its findings are recommendations based on source code patterns and project structure. Findings should be reviewed in the context of your application and are not guarantees of runtime performance problems.
+
+### UI Doctor Features
+* 📁 **Asset Validation**: Missing asset files, path letter-case mismatches, oversized asset files.
+* 🧹 **Code Health**: Production `debugPrint`/`print` statement detection (ignoring `kDebugMode` condition guards).
+* 📐 **Maintainability**: Large `build()` methods and oversized widget class detection.
+* ⚡ **Performance Heuristics**: `shrinkWrap: true` usages inside scrollable parent containers.
+* ♿ **Accessibility**: `Image` widgets missing `semanticLabel` descriptions or `excludeFromSemantics` flags.
+* 🎯 **Baseline & Regression Detection**: Save baseline snapshots (`--generate-baseline`) and enforce "no new issues" in CI quality gates (`--baseline`, `--fail-on-new`).
+* ⚙️ **Configurable**: Configurable via `.flutter_dev_intelligence.yaml`.
+
+### UI Doctor Commands
+
+```bash
+# Analyze Flutter UI and code-health patterns
+dart run flutter_dev_intelligence ui-doctor
+
+# Inspect a specific scope (assets, accessibility, performance, maintainability)
+dart run flutter_dev_intelligence ui-doctor --scope accessibility
+
+# Output machine-readable JSON for CI or tooling
+dart run flutter_dev_intelligence ui-doctor --format json --output ui-report.json
+
+# Generate a baseline snapshot
+dart run flutter_dev_intelligence ui-doctor --generate-baseline
+
+# Compare against baseline and fail CI only if new findings are introduced
+dart run flutter_dev_intelligence ui-doctor --baseline --fail-on-new
+```
+
+---
+
 ## Supported Diagnostic Categories
 
 | Category | Description | Example Rule IDs |

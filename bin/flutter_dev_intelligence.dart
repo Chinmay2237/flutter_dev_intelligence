@@ -31,6 +31,18 @@ Future<void> main(List<String> arguments) async {
       exitCode = await _runBuildDoctor(args);
       return;
 
+    case 'ui-doctor':
+    case 'ui_doctor':
+    case 'ui':
+    case 'inspect':
+      final args = (command == 'ui' || command == 'ui_doctor')
+          ? (arguments.length > 1 && arguments[1] == 'doctor'
+                ? arguments.skip(2).toList()
+                : arguments.skip(1).toList())
+          : arguments.skip(1).toList();
+      exitCode = await UiDoctorCli.run(args);
+      return;
+
     case 'doctor':
     case 'doc':
       exitCode = await _runBuildDoctor(arguments.skip(1).toList());
@@ -330,22 +342,30 @@ Future<int> _renderAndOutput(
 }
 
 void _printHelp() {
-  stdout.writeln('Flutter Dev Intelligence — Build Diagnostic Engine');
+  stdout.writeln('Flutter Dev Intelligence — Flutter Project Health & Diagnostics');
   stdout.writeln('');
   stdout.writeln(
-    'Offline-first diagnostic tool that analyzes Flutter and Dart build logs,',
+    'Offline-first diagnostic toolkit that analyzes Flutter and Dart projects,',
   );
-  stdout.writeln('identifies root causes, and separates cascading errors.');
+  stdout.writeln('build log failures, UI/UX accessibility gaps, and code health.');
+  stdout.writeln('');
+  stdout.writeln('Commands:');
+  stdout.writeln('  ui-doctor (or inspect)   Statically inspect Flutter UI, code health, accessibility & assets');
+  stdout.writeln('  build-doctor             Analyze Flutter/Dart build logs for root causes & cascading errors');
   stdout.writeln('');
   stdout.writeln(
-    'Usage: flutter_dev_intelligence build-doctor [options] (or dart run flutter_dev_intelligence build-doctor [options])',
+    'Usage: flutter_dev_intelligence <command> [options] (or dart run flutter_dev_intelligence <command> [options])',
   );
   stdout.writeln('');
-  stdout.writeln('Options:');
+  stdout.writeln('Options (build-doctor):');
   stdout.writeln('  --log <path>         Build log file path to analyze');
-  stdout.writeln(
-    '  --stdin              Read build log input from standard input pipe',
-  );
+  stdout.writeln('  --stdin              Read build log input from standard input pipe');
+  stdout.writeln('');
+  stdout.writeln('Options (ui-doctor / inspect):');
+  stdout.writeln('  --project <path>     Target Flutter project directory');
+  stdout.writeln('  --scope <scope>      Analysis scope: all, ui, accessibility, performance, maintainability, assets');
+  stdout.writeln('');
+  stdout.writeln('General Options:');
   stdout.writeln(
     '  --format <format>    Output format: terminal, json, or markdown (default: terminal)',
   );
@@ -358,9 +378,6 @@ void _printHelp() {
     '  --ascii              Use ASCII fallback character formatting',
   );
   stdout.writeln(
-    '  --project <path>     Project root directory (default: current directory)',
-  );
-  stdout.writeln(
     '  --verbose            Print detailed execution diagnostic logs',
   );
   stdout.writeln('  --quiet              Suppress stdout output');
@@ -368,11 +385,10 @@ void _printHelp() {
   stdout.writeln('  --version, -v        Show package version');
   stdout.writeln('');
   stdout.writeln('Examples:');
+  stdout.writeln('  dart run flutter_dev_intelligence ui-doctor');
+  stdout.writeln('  dart run flutter_dev_intelligence inspect --scope=accessibility');
   stdout.writeln(
     '  dart run flutter_dev_intelligence build-doctor --log=build.log',
-  );
-  stdout.writeln(
-    '  dart run flutter_dev_intelligence build-doctor --log=build.log --format=json',
   );
   stdout.writeln(
     '  cat build.log | dart run flutter_dev_intelligence build-doctor --stdin',

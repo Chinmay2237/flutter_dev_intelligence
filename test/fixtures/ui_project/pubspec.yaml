@@ -1,0 +1,8 @@
+name: fixture_flutter_app
+description: Miniature Flutter test fixture project
+version: 1.0.0
+environment:
+  sdk: ^3.0.0
+flutter:
+  assets:
+    - assets/missing_file.png

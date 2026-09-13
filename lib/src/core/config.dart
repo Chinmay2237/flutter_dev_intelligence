@@ -1,7 +1,7 @@
 export 'project_config.dart';
 
 /// Package version constant for flutter_dev_intelligence.
-const String kPackageVersion = '1.0.4';
+const String kPackageVersion = '1.2.0';
 
 /// Immutable configuration for Flutter Dev Intelligence Diagnostic Engine.
 class DevIntelligenceConfig {
@@ -18,7 +18,7 @@ class DevIntelligenceConfig {
     this.maxLogSizeBytes = 10485760, // 10MB default
     this.enableDebugLogging = false,
     this.enablePerformance = false,
-    this.enableUiDoctor = false,
+    this.enableUiDoctor = true,
   });
 
   DevIntelligenceConfig copyWith({

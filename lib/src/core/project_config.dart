@@ -248,6 +248,7 @@ class ProjectConfig {
       'analysis',
       'paths',
       'rules',
+      'ui_doctor',
       'performance',
       'ai',
       'privacy',

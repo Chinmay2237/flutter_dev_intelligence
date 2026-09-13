@@ -190,6 +190,7 @@ class DiagnosticFinding {
   final String? filePath;
   final int? line;
   final String source;
+  final String? baselineStatus;
 
   const DiagnosticFinding({
     required this.id,
@@ -207,10 +208,18 @@ class DiagnosticFinding {
     this.filePath,
     this.line,
     this.source = 'build_doctor',
+    this.baselineStatus,
   });
 
   bool get isPrimary => primaryStatus == PrimaryStatus.primary;
   bool get isCascading => primaryStatus == PrimaryStatus.cascading;
+
+  /// Fingerprint string uniquely identifying this finding across runs (ruleId:filePath:location).
+  String get fingerprint {
+    final path = (filePath ?? 'project').replaceAll('\\', '/');
+    final loc = line != null ? '$line' : (evidence.isNotEmpty ? evidence.first.value : '0');
+    return '$id:$path:$loc';
+  }
 
   /// Compatibility alias for description.
   String get description => summary;
@@ -243,6 +252,7 @@ class DiagnosticFinding {
     if (filePath != null) 'filePath': filePath,
     if (line != null) 'line': line,
     'source': source,
+    if (baselineStatus != null) 'baselineStatus': baselineStatus,
     'isPrimary': isPrimary,
   };
 
@@ -287,6 +297,52 @@ class DiagnosticFinding {
       filePath: json['filePath'] as String?,
       line: json['line'] as int?,
       source: json['source'] as String? ?? 'build_doctor',
+      baselineStatus: json['baselineStatus'] as String?,
+    );
+  }
+}
+
+/// Baseline comparison results when comparing a report to a baseline snapshot.
+class BaselineComparison {
+  final String baselinePath;
+  final String status;
+  final int totalBaselineFindings;
+  final int newCount;
+  final int resolvedCount;
+  final int unchangedCount;
+  final List<String> newFindingIds;
+
+  const BaselineComparison({
+    required this.baselinePath,
+    required this.status,
+    required this.totalBaselineFindings,
+    required this.newCount,
+    required this.resolvedCount,
+    required this.unchangedCount,
+    this.newFindingIds = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+    'baselinePath': baselinePath,
+    'status': status,
+    'totalBaselineFindings': totalBaselineFindings,
+    'newCount': newCount,
+    'resolvedCount': resolvedCount,
+    'unchangedCount': unchangedCount,
+    'newFindingIds': newFindingIds,
+  };
+
+  factory BaselineComparison.fromJson(Map<String, dynamic> json) {
+    return BaselineComparison(
+      baselinePath: json['baselinePath'] as String? ?? '',
+      status: json['status'] as String? ?? 'PASSED',
+      totalBaselineFindings: json['totalBaselineFindings'] as int? ?? 0,
+      newCount: json['newCount'] as int? ?? 0,
+      resolvedCount: json['resolvedCount'] as int? ?? 0,
+      unchangedCount: json['unchangedCount'] as int? ?? 0,
+      newFindingIds: ((json['newFindingIds'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(),
     );
   }
 }
@@ -313,6 +369,7 @@ class DiagnosticReport {
   final List<String> analyzedSources;
   final int? durationMs;
   final int? rulesExecuted;
+  final BaselineComparison? baseline;
 
   const DiagnosticReport({
     required this.id,
@@ -332,6 +389,7 @@ class DiagnosticReport {
     this.analyzedSources = const <String>[],
     this.durationMs,
     this.rulesExecuted,
+    this.baseline,
   });
 
   /// Compatibility alias for issues.
@@ -388,6 +446,7 @@ class DiagnosticReport {
     'analyzedSources': analyzedSources,
     if (durationMs != null) 'durationMs': durationMs,
     if (rulesExecuted != null) 'rulesExecuted': rulesExecuted,
+    if (baseline != null) 'baseline': baseline!.toJson(),
   };
 
   factory DiagnosticReport.fromJson(Map<String, dynamic> json) {
@@ -410,6 +469,11 @@ class DiagnosticReport {
           ),
         )
         .toList();
+
+    final baselineJson = json['baseline'] is Map ? (json['baseline'] as Map) : null;
+    final baselineComp = baselineJson != null
+        ? BaselineComparison.fromJson(Map<String, dynamic>.from(baselineJson))
+        : null;
 
     return DiagnosticReport(
       id: json['id'] as String? ?? 'report',
@@ -440,6 +504,7 @@ class DiagnosticReport {
           .toList(),
       durationMs: json['durationMs'] as int?,
       rulesExecuted: json['rulesExecuted'] as int?,
+      baseline: baselineComp,
     );
   }
 

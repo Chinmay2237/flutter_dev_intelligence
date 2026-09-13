@@ -37,6 +37,18 @@ class TerminalReporter {
     buffer.writeln('  Cascading Errors:    ${report.cascadingFindings.length}');
     buffer.writeln();
 
+    if (report.baseline != null) {
+      final b = report.baseline!;
+      buffer.writeln(_bold('Baseline Comparison Summary', useColor));
+      buffer.writeln('  Baseline File:   ${b.baselinePath}');
+      buffer.writeln('  Baseline Status: ${b.status}');
+      buffer.writeln('  Baseline Total:  ${b.totalBaselineFindings}');
+      buffer.writeln('  New Findings:    ${b.newCount}');
+      buffer.writeln('  Resolved:        ${b.resolvedCount}');
+      buffer.writeln('  Unchanged:       ${b.unchangedCount}');
+      buffer.writeln();
+    }
+
     // Primary Suspected Issues
     if (report.primaryFindings.isNotEmpty) {
       buffer.writeln(_bold('Primary Suspected Issues', useColor));
