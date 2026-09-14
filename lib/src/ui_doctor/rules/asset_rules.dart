@@ -44,8 +44,9 @@ class AssetMissingFileRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) {
         return findings;
+      }
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;
@@ -176,8 +177,9 @@ class AssetCaseMismatchRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) {
         return findings;
+      }
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;
@@ -294,8 +296,9 @@ class AssetOversizedRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) {
         return findings;
+      }
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;

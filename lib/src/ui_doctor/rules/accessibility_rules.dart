@@ -29,11 +29,9 @@ class _MissingImageSemanticsVisitor extends RecursiveAstVisitor<void> {
     if (_imageConstructors.contains(typeName) ||
         typeName.startsWith('Image.')) {
       final hasSemanticLabel = argumentList.arguments.any((arg) {
-        if (arg is NamedExpression) {
-          final label = arg.name.label.name;
-          return label == 'semanticLabel' || label == 'excludeFromSemantics';
-        }
-        return false;
+        final src = arg.toSource().replaceAll(' ', '');
+        return src.startsWith('semanticLabel:') ||
+            src.startsWith('excludeFromSemantics:');
       });
 
       if (!hasSemanticLabel) {

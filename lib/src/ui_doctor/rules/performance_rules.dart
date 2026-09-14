@@ -31,11 +31,8 @@ class _ShrinkWrapVisitor extends RecursiveAstVisitor<void> {
         typeName == 'GridView' ||
         typeName == 'PageView') {
       final hasShrinkWrapTrue = argumentList.arguments.any((arg) {
-        if (arg is NamedExpression && arg.name.label.name == 'shrinkWrap') {
-          final expr = arg.expression;
-          return expr is BooleanLiteral && expr.value == true;
-        }
-        return false;
+        final src = arg.toSource().replaceAll(' ', '');
+        return src.startsWith('shrinkWrap:true');
       });
 
       if (hasShrinkWrapTrue) {
