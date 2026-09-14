@@ -2,6 +2,7 @@
 class SecretRedactor {
   const SecretRedactor._();
 
+  /// Redacts sensitive strings such as tokens, API keys, credentials, and user path prefixes from [input].
   static String redact(String input) {
     if (input.isEmpty) {
       return input;

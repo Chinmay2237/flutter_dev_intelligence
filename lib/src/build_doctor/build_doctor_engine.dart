@@ -75,8 +75,12 @@ class BuildDoctorEngine {
 
     // 6. Apply Project Configuration Filters and Suppressions
     ProjectConfig? effectiveConfig = options.config;
-    if (effectiveConfig == null && options.projectPath != null && options.projectPath!.isNotEmpty) {
-      final configResult = await ProjectConfig.findAndLoad(options.projectPath!);
+    if (effectiveConfig == null &&
+        options.projectPath != null &&
+        options.projectPath!.isNotEmpty) {
+      final configResult = await ProjectConfig.findAndLoad(
+        options.projectPath!,
+      );
       effectiveConfig = configResult.config;
     }
 
@@ -113,4 +117,3 @@ class BuildDoctorEngine {
     );
   }
 }
-

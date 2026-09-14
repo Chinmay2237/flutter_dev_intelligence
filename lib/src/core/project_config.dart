@@ -133,32 +133,85 @@ class ProjectConfig {
     this.suppressions = const <SuppressionRule>[],
   });
 
+  /// Configuration format version.
   final int version;
+
+  /// Minimum severity threshold required for findings to be reported.
   final DiagnosticSeverity severityThreshold;
+
+  /// Minimum confidence score required for findings to be reported.
   final double confidenceThreshold;
+
+  /// Whether Build Doctor build log diagnostics are enabled.
   final bool enableBuildDoctor;
+
+  /// Whether UI Doctor static code analysis is enabled.
   final bool enableUiDoctor;
+
+  /// Whether performance check rules are enabled.
   final bool enablePerformance;
+
+  /// List of custom glob patterns to exclude from analysis.
   final List<String> excludePaths;
+
+  /// List of custom glob patterns to include in analysis.
   final List<String> includePaths;
+
+  /// Whether to exclude test files automatically.
   final bool excludeTests;
+
+  /// Whether to exclude example files automatically.
   final bool excludeExamples;
+
+  /// Whether to exclude generated code files automatically.
   final bool excludeGenerated;
+
+  /// Set of rule IDs that are explicitly disabled.
   final Set<String> disabledRules;
+
+  /// Optional set of rule IDs that are exclusively enabled.
   final Set<String>? enabledRules;
+
+  /// Target refresh rate in Hz for frame budget computations.
   final double refreshRateHz;
+
+  /// Frame time budget in milliseconds.
   final double frameBudgetMs;
+
+  /// Whether AI assistance features are enabled.
   final bool aiEnabled;
+
+  /// Selected AI provider name.
   final String? aiProvider;
+
+  /// Whether secret redaction is active.
   final bool redactSecrets;
+
+  /// Default output format.
   final String defaultFormat;
+
+  /// Default terminal color mode.
   final String defaultColor;
+
+  /// Whether quiet mode is default.
   final bool quiet;
+
+  /// Whether verbose mode is default.
   final bool verbose;
+
+  /// Maximum file size in bytes to analyze.
   final int maxFileSizeBytes;
+
+  /// Maximum log size in bytes to analyze.
   final int maxLogSizeBytes;
+
+  /// Maximum trace events buffer count.
   final int maxTraceEvents;
+
+  /// Maximum total issues count per report.
   final int maxIssuesCount;
+
+  /// List of custom suppression rules.
   final List<SuppressionRule> suppressions;
 
   /// Returns true if a given relative file path should be excluded based on config rules.
@@ -596,6 +649,9 @@ class ProjectConfig {
 
 /// Diagnostic issue filter applying ProjectConfig rules, severity, confidence, and suppressions.
 class DiagnosticFilter {
+  const DiagnosticFilter._();
+
+  /// Filters a list of [issues] against the provided [config] constraints.
   static List<DiagnosticIssue> filterIssues(
     List<DiagnosticIssue> issues,
     ProjectConfig config,
@@ -609,6 +665,7 @@ class DiagnosticFilter {
     return filtered;
   }
 
+  /// Determines whether a single [issue] should be filtered out based on [config].
   static bool shouldFilterIssue(DiagnosticIssue issue, ProjectConfig config) {
     // 1. Severity threshold filter
     if (_severityIndex(issue.severity) <
@@ -670,6 +727,7 @@ String normalizePath(String rawPath) {
   return p;
 }
 
+/// Returns true if [path] belongs to a generated source code file.
 bool isGeneratedFile(String path) {
   final norm = normalizePath(path);
   return norm.endsWith('.g.dart') ||
@@ -684,6 +742,7 @@ bool isGeneratedFile(String path) {
       norm.contains('/build/');
 }
 
+/// Returns true if [path] matches a glob pattern [pattern].
 bool matchPathPattern(String path, String pattern) {
   final normPath = normalizePath(path);
   final normPattern = normalizePath(pattern);

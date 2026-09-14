@@ -217,7 +217,9 @@ class DiagnosticFinding {
   /// Fingerprint string uniquely identifying this finding across runs (ruleId:filePath:location).
   String get fingerprint {
     final path = (filePath ?? 'project').replaceAll('\\', '/');
-    final loc = line != null ? '$line' : (evidence.isNotEmpty ? evidence.first.value : '0');
+    final loc = line != null
+        ? '$line'
+        : (evidence.isNotEmpty ? evidence.first.value : '0');
     return '$id:$path:$loc';
   }
 
@@ -476,7 +478,9 @@ class DiagnosticReport {
         )
         .toList();
 
-    final baselineJson = json['baseline'] is Map ? (json['baseline'] as Map) : null;
+    final baselineJson = json['baseline'] is Map
+        ? (json['baseline'] as Map)
+        : null;
     final baselineComp = baselineJson != null
         ? BaselineComparison.fromJson(Map<String, dynamic>.from(baselineJson))
         : null;

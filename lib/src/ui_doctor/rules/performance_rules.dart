@@ -22,8 +22,14 @@ class _ShrinkWrapVisitor extends RecursiveAstVisitor<void> {
     'PageView',
   };
 
-  void _checkInvocation(AstNode node, String typeName, ArgumentList argumentList) {
-    if (typeName == 'ListView' || typeName == 'GridView' || typeName == 'PageView') {
+  void _checkInvocation(
+    AstNode node,
+    String typeName,
+    ArgumentList argumentList,
+  ) {
+    if (typeName == 'ListView' ||
+        typeName == 'GridView' ||
+        typeName == 'PageView') {
       final hasShrinkWrapTrue = argumentList.arguments.any((arg) {
         if (arg is NamedExpression && arg.name.label.name == 'shrinkWrap') {
           final expr = arg.expression;
@@ -83,6 +89,7 @@ class _ShrinkWrapVisitor extends RecursiveAstVisitor<void> {
 
 /// Rule detecting shrinkWrap: true usage inside scrollable parent containers.
 class ShrinkWrapInScrollableRule extends UiDoctorRule {
+  /// Creates a new [ShrinkWrapInScrollableRule] instance.
   const ShrinkWrapInScrollableRule();
 
   @override
@@ -125,8 +132,10 @@ class ShrinkWrapInScrollableRule extends UiDoctorRule {
           category: category,
           severity: defaultSeverity,
           confidence: defaultConfidence,
-          summary: 'Potential nested-scroll performance concern: "$typeName(shrinkWrap: true)" inside scrollable context at $relativePath:$line.',
-          likelyCause: 'Static heuristic: Using shrinkWrap: true disables viewport virtualization for nested lists.',
+          summary:
+              'Potential nested-scroll performance concern: "$typeName(shrinkWrap: true)" inside scrollable context at $relativePath:$line.',
+          likelyCause:
+              'Static heuristic: Using shrinkWrap: true disables viewport virtualization for nested lists.',
           source: 'ui_doctor',
           filePath: relativePath,
           line: line,
@@ -134,15 +143,19 @@ class ShrinkWrapInScrollableRule extends UiDoctorRule {
           evidence: [
             EvidenceReference(
               label: 'Widget invocation',
-              value: match.node.toSource().length > 80 ? '${match.node.toSource().substring(0, 80)}...' : match.node.toSource(),
+              value: match.node.toSource().length > 80
+                  ? '${match.node.toSource().substring(0, 80)}...'
+                  : match.node.toSource(),
               lineNumber: line,
               type: 'source',
             ),
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Review whether shrink wrapping is necessary. Consider replacing with Slivers (e.g. SliverList) or unnesting scrollables.',
-              details: 'ShrinkWrap can be valid for small bounded lists, but disables virtualization in dynamic parent viewports.',
+              action:
+                  'Review whether shrink wrapping is necessary. Consider replacing with Slivers (e.g. SliverList) or unnesting scrollables.',
+              details:
+                  'ShrinkWrap can be valid for small bounded lists, but disables virtualization in dynamic parent viewports.',
             ),
           ],
         ),

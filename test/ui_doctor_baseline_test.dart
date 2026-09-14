@@ -8,10 +8,14 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('ui_doctor_baseline_test_');
+      tempDir = await Directory.systemTemp.createTemp(
+        'ui_doctor_baseline_test_',
+      );
 
       // Copy fixture layout to tempDir
-      final pubspec = File('${tempDir.path}${Platform.pathSeparator}pubspec.yaml');
+      final pubspec = File(
+        '${tempDir.path}${Platform.pathSeparator}pubspec.yaml',
+      );
       await pubspec.writeAsString('''
 name: temp_fixture_app
 version: 1.0.0
@@ -58,7 +62,9 @@ class MyWidget extends StatelessWidget {
 
       final testDir = Directory('${tempDir.path}${Platform.pathSeparator}test');
       await testDir.create(recursive: true);
-      final testFile = File('${testDir.path}${Platform.pathSeparator}widget_test.dart');
+      final testFile = File(
+        '${testDir.path}${Platform.pathSeparator}widget_test.dart',
+      );
       await testFile.writeAsString('void main() { print("test file print"); }');
     });
 
@@ -68,22 +74,31 @@ class MyWidget extends StatelessWidget {
       }
     });
 
-    test('Engine ignores kDebugMode guarded prints and respects excludeFromSemantics', () async {
-      final report = await UiDoctorEngine.analyze(
-        UiDoctorEngineOptions(projectPath: tempDir.path),
-      );
+    test(
+      'Engine ignores kDebugMode guarded prints and respects excludeFromSemantics',
+      () async {
+        final report = await UiDoctorEngine.analyze(
+          UiDoctorEngineOptions(projectPath: tempDir.path),
+        );
 
-      final debugFindings = report.findings.where((f) => f.id == 'UI_DEBUG_PRINT_IN_PROD').toList();
-      expect(debugFindings.length, equals(1));
-      expect(debugFindings.first.summary, contains('print'));
+        final debugFindings = report.findings
+            .where((f) => f.id == 'UI_DEBUG_PRINT_IN_PROD')
+            .toList();
+        expect(debugFindings.length, equals(1));
+        expect(debugFindings.first.summary, contains('print'));
 
-      final imageFindings = report.findings.where((f) => f.id == 'UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS').toList();
-      expect(imageFindings.first.summary, contains('Image.asset'));
-      expect(imageFindings.first.line, equals(19));
-    });
+        final imageFindings = report.findings
+            .where((f) => f.id == 'UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS')
+            .toList();
+        expect(imageFindings.first.summary, contains('Image.asset'));
+        expect(imageFindings.first.line, equals(19));
+      },
+    );
 
     test('CLI --generate-baseline saves baseline JSON snapshot', () async {
-      final baselineFile = File('${tempDir.path}${Platform.pathSeparator}baseline.json');
+      final baselineFile = File(
+        '${tempDir.path}${Platform.pathSeparator}baseline.json',
+      );
 
       final exitCode = await UiDoctorCli.run([
         '--project=${tempDir.path}',
@@ -100,7 +115,9 @@ class MyWidget extends StatelessWidget {
     });
 
     test('CLI --baseline compares snapshot and flags new issues', () async {
-      final baselineFile = File('${tempDir.path}${Platform.pathSeparator}baseline.json');
+      final baselineFile = File(
+        '${tempDir.path}${Platform.pathSeparator}baseline.json',
+      );
 
       // 1. Generate baseline
       await UiDoctorCli.run([
@@ -115,15 +132,24 @@ class MyWidget extends StatelessWidget {
         '--baseline=${baselineFile.path}',
         '--quiet',
       ]);
-      expect(passExitCode, equals(1)); // Has error finding UI_ASSET_MISSING_FILE, but no new baseline findings
+      expect(
+        passExitCode,
+        equals(1),
+      ); // Has error finding UI_ASSET_MISSING_FILE, but no new baseline findings
 
       // 3. Add a NEW flaw to lib/main.dart
-      final mainDart = File('${tempDir.path}${Platform.pathSeparator}lib${Platform.pathSeparator}main.dart');
+      final mainDart = File(
+        '${tempDir.path}${Platform.pathSeparator}lib${Platform.pathSeparator}main.dart',
+      );
       final currentContent = await mainDart.readAsString();
-      await mainDart.writeAsString('$currentContent\nvoid anotherFunc() { print("new raw print"); }\n');
+      await mainDart.writeAsString(
+        '$currentContent\nvoid anotherFunc() { print("new raw print"); }\n',
+      );
 
       // 4. Run baseline comparison -> detects new finding
-      final baselineReportFile = File('${tempDir.path}${Platform.pathSeparator}diff_report.json');
+      final baselineReportFile = File(
+        '${tempDir.path}${Platform.pathSeparator}diff_report.json',
+      );
       final failExitCode = await UiDoctorCli.run([
         '--project=${tempDir.path}',
         '--baseline=${baselineFile.path}',
@@ -135,7 +161,9 @@ class MyWidget extends StatelessWidget {
       expect(failExitCode, equals(1));
       expect(baselineReportFile.existsSync(), isTrue);
 
-      final decodedReport = jsonDecode(await baselineReportFile.readAsString()) as Map<String, dynamic>;
+      final decodedReport =
+          jsonDecode(await baselineReportFile.readAsString())
+              as Map<String, dynamic>;
       expect(decodedReport['baseline'], isNotNull);
       expect(decodedReport['baseline']['status'], equals('FAILED'));
       expect(decodedReport['baseline']['newCount'], greaterThanOrEqualTo(1));

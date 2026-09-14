@@ -17,26 +17,33 @@ void main() {
       }
     });
 
-    test('UI_ASSET_MISSING_FILE flags missing asset files declared in pubspec', () async {
-      final pubspecFile = File('${tempDir.path}${Platform.pathSeparator}pubspec.yaml');
-      await pubspecFile.writeAsString('''
+    test(
+      'UI_ASSET_MISSING_FILE flags missing asset files declared in pubspec',
+      () async {
+        final pubspecFile = File(
+          '${tempDir.path}${Platform.pathSeparator}pubspec.yaml',
+        );
+        await pubspecFile.writeAsString('''
 name: test_app
 flutter:
   assets:
     - assets/images/missing_logo.png
 ''');
 
-      const rule = AssetMissingFileRule();
-      final findings = rule.analyzeProject(projectPath: tempDir.path);
+        const rule = AssetMissingFileRule();
+        final findings = rule.analyzeProject(projectPath: tempDir.path);
 
-      expect(findings.length, equals(1));
-      expect(findings.first.id, equals('UI_ASSET_MISSING_FILE'));
-      expect(findings.first.severity, equals(DiagnosticSeverity.error));
-      expect(findings.first.summary, contains('missing_logo.png'));
-    });
+        expect(findings.length, equals(1));
+        expect(findings.first.id, equals('UI_ASSET_MISSING_FILE'));
+        expect(findings.first.severity, equals(DiagnosticSeverity.error));
+        expect(findings.first.summary, contains('missing_logo.png'));
+      },
+    );
 
     test('UI_ASSET_CASE_MISMATCH detects casing differences on disk', () async {
-      final pubspecFile = File('${tempDir.path}${Platform.pathSeparator}pubspec.yaml');
+      final pubspecFile = File(
+        '${tempDir.path}${Platform.pathSeparator}pubspec.yaml',
+      );
       await pubspecFile.writeAsString('''
 name: test_app
 flutter:
@@ -44,7 +51,9 @@ flutter:
     - assets/images/Logo.png
 ''');
 
-      final imgDir = Directory('${tempDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}images');
+      final imgDir = Directory(
+        '${tempDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}images',
+      );
       await imgDir.create(recursive: true);
       final imgFile = File('${imgDir.path}${Platform.pathSeparator}logo.png');
       await imgFile.writeAsString('dummy img');
@@ -57,28 +66,35 @@ flutter:
       expect(findings.first.severity, equals(DiagnosticSeverity.warning));
     });
 
-    test('UI_ASSET_OVERSIZED flags image files larger than size threshold', () async {
-      final pubspecFile = File('${tempDir.path}${Platform.pathSeparator}pubspec.yaml');
-      await pubspecFile.writeAsString('''
+    test(
+      'UI_ASSET_OVERSIZED flags image files larger than size threshold',
+      () async {
+        final pubspecFile = File(
+          '${tempDir.path}${Platform.pathSeparator}pubspec.yaml',
+        );
+        await pubspecFile.writeAsString('''
 name: test_app
 flutter:
   assets:
     - assets/large.png
 ''');
 
-      final largeFile = File('${tempDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}large.png');
-      await largeFile.create(recursive: true);
-      // Write 2.5 MB of data
-      final bytes = List<int>.filled(2500000, 0);
-      await largeFile.writeAsBytes(bytes);
+        final largeFile = File(
+          '${tempDir.path}${Platform.pathSeparator}assets${Platform.pathSeparator}large.png',
+        );
+        await largeFile.create(recursive: true);
+        // Write 2.5 MB of data
+        final bytes = List<int>.filled(2500000, 0);
+        await largeFile.writeAsBytes(bytes);
 
-      const rule = AssetOversizedRule(maxSizeBytes: 2000000);
-      final findings = rule.analyzeProject(projectPath: tempDir.path);
+        const rule = AssetOversizedRule(maxSizeBytes: 2000000);
+        final findings = rule.analyzeProject(projectPath: tempDir.path);
 
-      expect(findings.length, equals(1));
-      expect(findings.first.id, equals('UI_ASSET_OVERSIZED'));
-      expect(findings.first.summary, contains('large.png'));
-    });
+        expect(findings.length, equals(1));
+        expect(findings.first.id, equals('UI_ASSET_OVERSIZED'));
+        expect(findings.first.summary, contains('large.png'));
+      },
+    );
 
     test('UI_DEBUG_PRINT_IN_PROD flags print and debugPrint calls', () {
       const source = '''
@@ -100,12 +116,21 @@ void logData() {
       );
 
       expect(findings.length, equals(2));
-      expect(findings.map((f) => f.id), everyElement(equals('UI_DEBUG_PRINT_IN_PROD')));
+      expect(
+        findings.map((f) => f.id),
+        everyElement(equals('UI_DEBUG_PRINT_IN_PROD')),
+      );
     });
 
-    test('UI_LARGE_BUILD_METHOD flags build methods exceeding line threshold', () {
-      final lines = List<String>.generate(120, (i) => '    final item$i = $i;');
-      final source = '''
+    test(
+      'UI_LARGE_BUILD_METHOD flags build methods exceeding line threshold',
+      () {
+        final lines = List<String>.generate(
+          120,
+          (i) => '    final item$i = $i;',
+        );
+        final source =
+            '''
 import 'package:flutter/material.dart';
 
 class MyLargeWidget extends StatelessWidget {
@@ -118,23 +143,26 @@ ${lines.join('\n')}
   }
 }
 ''';
-      final ast = parseString(content: source).unit;
-      const rule = LargeBuildMethodRule(maxLines: 100);
+        final ast = parseString(content: source).unit;
+        const rule = LargeBuildMethodRule(maxLines: 100);
 
-      final findings = rule.analyzeDartFile(
-        filePath: '/lib/widget.dart',
-        relativePath: 'lib/widget.dart',
-        content: source,
-        ast: ast,
-      );
+        final findings = rule.analyzeDartFile(
+          filePath: '/lib/widget.dart',
+          relativePath: 'lib/widget.dart',
+          content: source,
+          ast: ast,
+        );
 
-      expect(findings.length, equals(1));
-      expect(findings.first.id, equals('UI_LARGE_BUILD_METHOD'));
-      expect(findings.first.summary, contains('MyLargeWidget'));
-    });
+        expect(findings.length, equals(1));
+        expect(findings.first.id, equals('UI_LARGE_BUILD_METHOD'));
+        expect(findings.first.summary, contains('MyLargeWidget'));
+      },
+    );
 
-    test('UI_SHRINKWRAP_IN_SCROLLABLE flags shrinkWrap: true inside scrollable ancestor', () {
-      const source = '''
+    test(
+      'UI_SHRINKWRAP_IN_SCROLLABLE flags shrinkWrap: true inside scrollable ancestor',
+      () {
+        const source = '''
 import 'package:flutter/material.dart';
 
 Widget buildList() {
@@ -146,40 +174,47 @@ Widget buildList() {
   );
 }
 ''';
-      final ast = parseString(content: source).unit;
-      const rule = ShrinkWrapInScrollableRule();
+        final ast = parseString(content: source).unit;
+        const rule = ShrinkWrapInScrollableRule();
 
-      final findings = rule.analyzeDartFile(
-        filePath: '/lib/list.dart',
-        relativePath: 'lib/list.dart',
-        content: source,
-        ast: ast,
-      );
+        final findings = rule.analyzeDartFile(
+          filePath: '/lib/list.dart',
+          relativePath: 'lib/list.dart',
+          content: source,
+          ast: ast,
+        );
 
-      expect(findings.length, equals(1));
-      expect(findings.first.id, equals('UI_SHRINKWRAP_IN_SCROLLABLE'));
-    });
+        expect(findings.length, equals(1));
+        expect(findings.first.id, equals('UI_SHRINKWRAP_IN_SCROLLABLE'));
+      },
+    );
 
-    test('UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS flags Image calls without label', () {
-      const source = '''
+    test(
+      'UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS flags Image calls without label',
+      () {
+        const source = '''
 import 'package:flutter/material.dart';
 
 Widget buildImage() {
   return Image.asset('assets/icon.png');
 }
 ''';
-      final ast = parseString(content: source).unit;
-      const rule = AccessibilityMissingImageSemanticsRule();
+        final ast = parseString(content: source).unit;
+        const rule = AccessibilityMissingImageSemanticsRule();
 
-      final findings = rule.analyzeDartFile(
-        filePath: '/lib/img.dart',
-        relativePath: 'lib/img.dart',
-        content: source,
-        ast: ast,
-      );
+        final findings = rule.analyzeDartFile(
+          filePath: '/lib/img.dart',
+          relativePath: 'lib/img.dart',
+          content: source,
+          ast: ast,
+        );
 
-      expect(findings.length, equals(1));
-      expect(findings.first.id, equals('UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS'));
-    });
+        expect(findings.length, equals(1));
+        expect(
+          findings.first.id,
+          equals('UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS'),
+        );
+      },
+    );
   });
 }

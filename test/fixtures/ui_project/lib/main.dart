@@ -18,10 +18,7 @@ class MySampleWidget extends StatelessWidget {
         children: [
           Image.asset('assets/missing_file.png'),
           Image.asset('assets/decorative.png', excludeFromSemantics: true),
-          ListView(
-            shrinkWrap: true,
-            children: const [],
-          ),
+          ListView(shrinkWrap: true, children: const []),
         ],
       ),
     );

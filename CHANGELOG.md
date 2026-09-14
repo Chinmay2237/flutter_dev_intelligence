@@ -1,3 +1,9 @@
+## 1.2.1
+
+### Fixed & Improved
+- **Dependency Compatibility**: Widened `analyzer` dependency constraint (`>=6.0.0 <15.0.0`) to support analyzer versions 7.x through 14.x across Dart SDK versions.
+- **Documentation & Package Score**: Added comprehensive dartdoc documentation comments across public API exports and standardized OSI license formatting.
+
 ## 1.2.0
 
 ### Added

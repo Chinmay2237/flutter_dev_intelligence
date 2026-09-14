@@ -12,6 +12,7 @@ import 'rules/ui_rule_base.dart';
 
 /// Options for configuring a UI Doctor analysis execution.
 class UiDoctorEngineOptions {
+  /// Creates a new [UiDoctorEngineOptions] instance.
   const UiDoctorEngineOptions({
     required this.projectPath,
     this.scope = 'all',
@@ -21,16 +22,29 @@ class UiDoctorEngineOptions {
     this.baselinePath,
   });
 
+  /// Path to the target Flutter project directory.
   final String projectPath;
+
+  /// Diagnostic scope filter (e.g. 'all', 'ui', 'accessibility', 'performance', 'maintainability', 'assets').
   final String scope;
+
+  /// Optional project name override.
   final String? projectName;
+
+  /// Optional custom project configuration override.
   final ProjectConfig? config;
+
+  /// Optional baseline report for findings diffing.
   final DiagnosticReport? baselineReport;
+
+  /// Optional path to baseline report file.
   final String? baselinePath;
 }
 
 /// Analysis engine executing static UI, code health, accessibility, and asset diagnostics.
 class UiDoctorEngine {
+  const UiDoctorEngine._();
+
   /// Default set of registered UI Doctor rules.
   static final List<UiDoctorRule> defaultRules = [
     const AssetMissingFileRule(),
@@ -43,6 +57,7 @@ class UiDoctorEngine {
     const AccessibilityMissingImageSemanticsRule(),
   ];
 
+  /// Analyzes a Flutter project with the given [options] and returns a [DiagnosticReport].
   static Future<DiagnosticReport> analyze(UiDoctorEngineOptions options) async {
     final stopwatch = Stopwatch()..start();
     final projectDir = Directory(options.projectPath);
@@ -52,8 +67,11 @@ class UiDoctorEngine {
     final config = options.config ?? configResult.config;
 
     final pubspecResult = await PubspecAnalyzer.analyze(absoluteProjectPath);
-    final resolvedProjectName = options.projectName ??
-        (pubspecResult.packageName.isNotEmpty ? pubspecResult.packageName : _resolveDirName(absoluteProjectPath));
+    final resolvedProjectName =
+        options.projectName ??
+        (pubspecResult.packageName.isNotEmpty
+            ? pubspecResult.packageName
+            : _resolveDirName(absoluteProjectPath));
 
     final rulesToRun = defaultRules.where((rule) {
       if (options.scope == 'all' || options.scope.isEmpty) return true;
@@ -75,7 +93,9 @@ class UiDoctorEngine {
     }
 
     // 2. Scan Dart source files under lib/ directory
-    final libDir = Directory('$absoluteProjectPath${Platform.pathSeparator}lib');
+    final libDir = Directory(
+      '$absoluteProjectPath${Platform.pathSeparator}lib',
+    );
     if (libDir.existsSync()) {
       final dartFiles = libDir
           .listSync(recursive: true)
@@ -85,7 +105,9 @@ class UiDoctorEngine {
 
       for (final file in dartFiles) {
         final relPath = file.path.startsWith(absoluteProjectPath)
-            ? file.path.substring(absoluteProjectPath.length).replaceAll(RegExp(r'^[/\\]+'), '')
+            ? file.path
+                  .substring(absoluteProjectPath.length)
+                  .replaceAll(RegExp(r'^[/\\]+'), '')
             : file.path;
 
         if (config.shouldExcludePath(relPath)) continue;
@@ -96,7 +118,10 @@ class UiDoctorEngine {
 
           analyzedSources.add(relPath);
 
-          final parseResult = parseString(content: content, throwIfDiagnostics: false);
+          final parseResult = parseString(
+            content: content,
+            throwIfDiagnostics: false,
+          );
           final ast = parseResult.unit;
 
           for (final rule in rulesToRun) {
@@ -122,12 +147,18 @@ class UiDoctorEngine {
     BaselineComparison? baselineComparison;
     if (options.baselineReport != null) {
       final baseline = options.baselineReport!;
-      final baselineFingerprints = baseline.findings.map((f) => f.fingerprint).toSet();
-      final currentFingerprints = filteredFindings.map((f) => f.fingerprint).toSet();
+      final baselineFingerprints = baseline.findings
+          .map((f) => f.fingerprint)
+          .toSet();
+      final currentFingerprints = filteredFindings
+          .map((f) => f.fingerprint)
+          .toSet();
 
       final updatedFindings = <DiagnosticFinding>[];
       for (final finding in filteredFindings) {
-        final status = baselineFingerprints.contains(finding.fingerprint) ? 'unchanged' : 'new';
+        final status = baselineFingerprints.contains(finding.fingerprint)
+            ? 'unchanged'
+            : 'new';
         updatedFindings.add(
           DiagnosticFinding(
             id: finding.id,
@@ -151,8 +182,12 @@ class UiDoctorEngine {
       }
       filteredFindings = updatedFindings;
 
-      final newFindings = updatedFindings.where((f) => f.baselineStatus == 'new').toList();
-      final unchangedFindings = updatedFindings.where((f) => f.baselineStatus == 'unchanged').toList();
+      final newFindings = updatedFindings
+          .where((f) => f.baselineStatus == 'new')
+          .toList();
+      final unchangedFindings = updatedFindings
+          .where((f) => f.baselineStatus == 'unchanged')
+          .toList();
       final resolvedFindingIds = <String>[];
       for (final baselineFinding in baseline.findings) {
         if (!currentFingerprints.contains(baselineFinding.fingerprint)) {
@@ -166,7 +201,8 @@ class UiDoctorEngine {
       final statusStr = newCount > 0 ? 'FAILED' : 'PASSED';
 
       baselineComparison = BaselineComparison(
-        baselinePath: options.baselinePath ?? '.flutter_dev_intelligence_baseline.json',
+        baselinePath:
+            options.baselinePath ?? '.flutter_dev_intelligence_baseline.json',
         status: statusStr,
         totalBaselineFindings: baseline.findings.length,
         newCount: newCount,
@@ -199,6 +235,8 @@ class UiDoctorEngine {
   static String _resolveDirName(String path) {
     final normalized = path.replaceAll(RegExp(r'[/\\]+$'), '');
     final lastSegment = normalized.split(Platform.pathSeparator).last;
-    return (lastSegment.isEmpty || lastSegment == '.') ? 'flutter-project' : lastSegment;
+    return (lastSegment.isEmpty || lastSegment == '.')
+        ? 'flutter-project'
+        : lastSegment;
   }
 }

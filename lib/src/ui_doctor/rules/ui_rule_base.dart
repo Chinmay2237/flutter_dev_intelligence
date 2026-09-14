@@ -4,6 +4,7 @@ import '../../core/models.dart';
 
 /// Base class for all UI Doctor static analysis diagnostic rules.
 abstract class UiDoctorRule {
+  /// Creates a new [UiDoctorRule] instance.
   const UiDoctorRule();
 
   /// Unique stable identifier for this diagnostic rule.

@@ -344,16 +344,24 @@ Future<int> _renderAndOutput(
 }
 
 void _printHelp() {
-  stdout.writeln('Flutter Dev Intelligence — Flutter Project Health & Diagnostics');
+  stdout.writeln(
+    'Flutter Dev Intelligence — Flutter Project Health & Diagnostics',
+  );
   stdout.writeln('');
   stdout.writeln(
     'Offline-first diagnostic toolkit that analyzes Flutter and Dart projects,',
   );
-  stdout.writeln('build log failures, UI/UX accessibility gaps, and code health.');
+  stdout.writeln(
+    'build log failures, UI/UX accessibility gaps, and code health.',
+  );
   stdout.writeln('');
   stdout.writeln('Commands:');
-  stdout.writeln('  ui-doctor (or inspect)   Statically inspect Flutter UI, code health, accessibility & assets');
-  stdout.writeln('  build-doctor             Analyze Flutter/Dart build logs for root causes & cascading errors');
+  stdout.writeln(
+    '  ui-doctor (or inspect)   Statically inspect Flutter UI, code health, accessibility & assets',
+  );
+  stdout.writeln(
+    '  build-doctor             Analyze Flutter/Dart build logs for root causes & cascading errors',
+  );
   stdout.writeln('');
   stdout.writeln(
     'Usage: flutter_dev_intelligence <command> [options] (or dart run flutter_dev_intelligence <command> [options])',
@@ -361,11 +369,15 @@ void _printHelp() {
   stdout.writeln('');
   stdout.writeln('Options (build-doctor):');
   stdout.writeln('  --log <path>         Build log file path to analyze');
-  stdout.writeln('  --stdin              Read build log input from standard input pipe');
+  stdout.writeln(
+    '  --stdin              Read build log input from standard input pipe',
+  );
   stdout.writeln('');
   stdout.writeln('Options (ui-doctor / inspect):');
   stdout.writeln('  --project <path>     Target Flutter project directory');
-  stdout.writeln('  --scope <scope>      Analysis scope: all, ui, accessibility, performance, maintainability, assets');
+  stdout.writeln(
+    '  --scope <scope>      Analysis scope: all, ui, accessibility, performance, maintainability, assets',
+  );
   stdout.writeln('');
   stdout.writeln('General Options:');
   stdout.writeln(
@@ -388,7 +400,9 @@ void _printHelp() {
   stdout.writeln('');
   stdout.writeln('Examples:');
   stdout.writeln('  dart run flutter_dev_intelligence ui-doctor');
-  stdout.writeln('  dart run flutter_dev_intelligence inspect --scope=accessibility');
+  stdout.writeln(
+    '  dart run flutter_dev_intelligence inspect --scope=accessibility',
+  );
   stdout.writeln(
     '  dart run flutter_dev_intelligence build-doctor --log=build.log',
   );

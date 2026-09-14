@@ -21,8 +21,13 @@ class _MissingImageSemanticsVisitor extends RecursiveAstVisitor<void> {
     'Image.memory',
   };
 
-  void _checkInvocation(AstNode node, String typeName, ArgumentList argumentList) {
-    if (_imageConstructors.contains(typeName) || typeName.startsWith('Image.')) {
+  void _checkInvocation(
+    AstNode node,
+    String typeName,
+    ArgumentList argumentList,
+  ) {
+    if (_imageConstructors.contains(typeName) ||
+        typeName.startsWith('Image.')) {
       final hasSemanticLabel = argumentList.arguments.any((arg) {
         if (arg is NamedExpression) {
           final label = arg.name.label.name;
@@ -35,9 +40,12 @@ class _MissingImageSemanticsVisitor extends RecursiveAstVisitor<void> {
         AstNode? current = node.parent;
         var wrappedInSemantics = false;
 
-        while (current != null && current is! MethodDeclaration && current is! FunctionDeclaration) {
+        while (current != null &&
+            current is! MethodDeclaration &&
+            current is! FunctionDeclaration) {
           final ancestorType = _extractTypeName(current);
-          if (ancestorType == 'Semantics' || ancestorType == 'ExcludeSemantics') {
+          if (ancestorType == 'Semantics' ||
+              ancestorType == 'ExcludeSemantics') {
             wrappedInSemantics = true;
             break;
           }
@@ -84,6 +92,7 @@ class _MissingImageSemanticsVisitor extends RecursiveAstVisitor<void> {
 
 /// Rule detecting Image widgets missing semanticLabel descriptions.
 class AccessibilityMissingImageSemanticsRule extends UiDoctorRule {
+  /// Creates a new [AccessibilityMissingImageSemanticsRule] instance.
   const AccessibilityMissingImageSemanticsRule();
 
   @override
@@ -126,8 +135,10 @@ class AccessibilityMissingImageSemanticsRule extends UiDoctorRule {
           category: category,
           severity: defaultSeverity,
           confidence: defaultConfidence,
-          summary: '"$typeName" at $relativePath:$line lacks a semanticLabel or Semantics parent widget.',
-          likelyCause: 'Screen readers cannot describe visual image assets without explicit semantic labels or Semantics context.',
+          summary:
+              '"$typeName" at $relativePath:$line lacks a semanticLabel or Semantics parent widget.',
+          likelyCause:
+              'Screen readers cannot describe visual image assets without explicit semantic labels or Semantics context.',
           source: 'ui_doctor',
           filePath: relativePath,
           line: line,
@@ -135,14 +146,17 @@ class AccessibilityMissingImageSemanticsRule extends UiDoctorRule {
           evidence: [
             EvidenceReference(
               label: 'Image invocation',
-              value: match.node.toSource().length > 70 ? '${match.node.toSource().substring(0, 70)}...' : match.node.toSource(),
+              value: match.node.toSource().length > 70
+                  ? '${match.node.toSource().substring(0, 70)}...'
+                  : match.node.toSource(),
               lineNumber: line,
               type: 'source',
             ),
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Add semanticLabel to $typeName, set excludeFromSemantics: true for decorative images, or wrap with Semantics / ExcludeSemantics.',
+              action:
+                  'Add semanticLabel to $typeName, set excludeFromSemantics: true for decorative images, or wrap with Semantics / ExcludeSemantics.',
             ),
           ],
         ),

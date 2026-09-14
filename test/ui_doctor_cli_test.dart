@@ -11,7 +11,9 @@ void main() {
       tempDir = await Directory.systemTemp.createTemp('ui_doctor_cli_test_');
 
       // Create valid mini Flutter project layout
-      final pubspec = File('${tempDir.path}${Platform.pathSeparator}pubspec.yaml');
+      final pubspec = File(
+        '${tempDir.path}${Platform.pathSeparator}pubspec.yaml',
+      );
       await pubspec.writeAsString('''
 name: sample_flutter_app
 description: Sample app for testing UI Doctor CLI
@@ -51,68 +53,87 @@ class MyWidget extends StatelessWidget {
       }
     });
 
-    test('UiDoctorEngine runs all rules and returns diagnostic report', () async {
-      final report = await UiDoctorEngine.analyze(
-        UiDoctorEngineOptions(projectPath: tempDir.path),
-      );
+    test(
+      'UiDoctorEngine runs all rules and returns diagnostic report',
+      () async {
+        final report = await UiDoctorEngine.analyze(
+          UiDoctorEngineOptions(projectPath: tempDir.path),
+        );
 
-      expect(report.projectName, equals('sample_flutter_app'));
-      expect(report.commandName, equals('ui-doctor'));
-      expect(report.findings, isNotEmpty);
+        expect(report.projectName, equals('sample_flutter_app'));
+        expect(report.commandName, equals('ui-doctor'));
+        expect(report.findings, isNotEmpty);
 
-      final findingIds = report.findings.map((f) => f.id).toSet();
-      expect(findingIds, contains('UI_ASSET_MISSING_FILE'));
-      expect(findingIds, contains('UI_DEBUG_PRINT_IN_PROD'));
-      expect(findingIds, contains('UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS'));
-    });
+        final findingIds = report.findings.map((f) => f.id).toSet();
+        expect(findingIds, contains('UI_ASSET_MISSING_FILE'));
+        expect(findingIds, contains('UI_DEBUG_PRINT_IN_PROD'));
+        expect(
+          findingIds,
+          contains('UI_ACCESSIBILITY_MISSING_IMAGE_SEMANTICS'),
+        );
+      },
+    );
 
     test('UiDoctorEngine respects --scope filtering', () async {
       final report = await UiDoctorEngine.analyze(
-        UiDoctorEngineOptions(
-          projectPath: tempDir.path,
-          scope: 'assets',
-        ),
+        UiDoctorEngineOptions(projectPath: tempDir.path, scope: 'assets'),
       );
 
       expect(report.findings, isNotEmpty);
-      expect(report.findings.every((f) => f.id.startsWith('UI_ASSET_')), isTrue);
+      expect(
+        report.findings.every((f) => f.id.startsWith('UI_ASSET_')),
+        isTrue,
+      );
     });
 
-    test('UiDoctorCli outputs JSON format when --format=json is specified', () async {
-      final outputFile = File('${tempDir.path}${Platform.pathSeparator}report.json');
+    test(
+      'UiDoctorCli outputs JSON format when --format=json is specified',
+      () async {
+        final outputFile = File(
+          '${tempDir.path}${Platform.pathSeparator}report.json',
+        );
 
-      final exitCode = await UiDoctorCli.run([
-        '--project=${tempDir.path}',
-        '--format=json',
-        '--output=${outputFile.path}',
-        '--quiet',
-      ]);
+        final exitCode = await UiDoctorCli.run([
+          '--project=${tempDir.path}',
+          '--format=json',
+          '--output=${outputFile.path}',
+          '--quiet',
+        ]);
 
-      // Returns exit code 1 because UI_ASSET_MISSING_FILE is DiagnosticSeverity.error
-      expect(exitCode, equals(1));
-      expect(outputFile.existsSync(), isTrue);
+        // Returns exit code 1 because UI_ASSET_MISSING_FILE is DiagnosticSeverity.error
+        expect(exitCode, equals(1));
+        expect(outputFile.existsSync(), isTrue);
 
-      final jsonContent = await outputFile.readAsString();
-      final decoded = jsonDecode(jsonContent) as Map<String, dynamic>;
+        final jsonContent = await outputFile.readAsString();
+        final decoded = jsonDecode(jsonContent) as Map<String, dynamic>;
 
-      expect(decoded['commandName'], equals('ui-doctor'));
-      expect(decoded['findings'], isA<List>());
-    });
+        expect(decoded['commandName'], equals('ui-doctor'));
+        expect(decoded['findings'], isA<List>());
+      },
+    );
 
-    test('UiDoctorCli outputs Markdown format when --format=markdown is specified', () async {
-      final outputFile = File('${tempDir.path}${Platform.pathSeparator}report.md');
+    test(
+      'UiDoctorCli outputs Markdown format when --format=markdown is specified',
+      () async {
+        final outputFile = File(
+          '${tempDir.path}${Platform.pathSeparator}report.md',
+        );
 
-      await UiDoctorCli.run([
-        '--project=${tempDir.path}',
-        '--format=markdown',
-        '--output=${outputFile.path}',
-        '--quiet',
-      ]);
+        await UiDoctorCli.run([
+          '--project=${tempDir.path}',
+          '--format=markdown',
+          '--output=${outputFile.path}',
+          '--quiet',
+        ]);
 
-      expect(outputFile.existsSync(), isTrue);
-      final mdContent = await outputFile.readAsString();
-      expect(mdContent, contains('# Flutter Dev Intelligence Diagnostic Report'));
-      expect(mdContent, contains('UI_ASSET_MISSING_FILE'));
-    });
+        expect(outputFile.existsSync(), isTrue);
+        final mdContent = await outputFile.readAsString();
+        expect(
+          mdContent,
+          contains('# Flutter Dev Intelligence Diagnostic Report'),
+        );
+        expect(mdContent, contains('UI_ASSET_MISSING_FILE'));
+      },
+    );
   });
 }

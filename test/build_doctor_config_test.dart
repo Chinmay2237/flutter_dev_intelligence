@@ -7,7 +7,9 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      tempDir = await Directory.systemTemp.createTemp('build_doctor_config_test_');
+      tempDir = await Directory.systemTemp.createTemp(
+        'build_doctor_config_test_',
+      );
     });
 
     tearDown(() async {
@@ -27,39 +29,45 @@ Execution failed for task ':app:compileDebugJavaWithJavac'.
 BUILD FAILED in 5s
 ''';
 
-    test('BuildDoctorEngine detects findings when no rules are disabled', () async {
-      final report = await BuildDoctorEngine.analyze(
-        options: BuildDoctorEngineOptions(
-          logContent: sampleGradleErrorLog,
-          projectPath: tempDir.path,
-        ),
-      );
+    test(
+      'BuildDoctorEngine detects findings when no rules are disabled',
+      () async {
+        final report = await BuildDoctorEngine.analyze(
+          options: BuildDoctorEngineOptions(
+            logContent: sampleGradleErrorLog,
+            projectPath: tempDir.path,
+          ),
+        );
 
-      final ruleIds = report.findings.map((f) => f.id).toSet();
-      expect(ruleIds, contains('GRADLE_DEPENDENCY_RESOLUTION_FAILED'));
-    });
+        final ruleIds = report.findings.map((f) => f.id).toSet();
+        expect(ruleIds, contains('GRADLE_DEPENDENCY_RESOLUTION_FAILED'));
+      },
+    );
 
-    test('BuildDoctorEngine respects disabled_rules in ProjectConfig', () async {
-      final configYaml = '''
+    test(
+      'BuildDoctorEngine respects disabled_rules in ProjectConfig',
+      () async {
+        final configYaml = '''
 version: 1
 rules:
   disabled:
     - GRADLE_DEPENDENCY_RESOLUTION_FAILED
 ''';
 
-      final config = ProjectConfig.parseYaml(configYaml).config;
+        final config = ProjectConfig.parseYaml(configYaml).config;
 
-      final report = await BuildDoctorEngine.analyze(
-        options: BuildDoctorEngineOptions(
-          logContent: sampleGradleErrorLog,
-          projectPath: tempDir.path,
-          config: config,
-        ),
-      );
+        final report = await BuildDoctorEngine.analyze(
+          options: BuildDoctorEngineOptions(
+            logContent: sampleGradleErrorLog,
+            projectPath: tempDir.path,
+            config: config,
+          ),
+        );
 
-      final ruleIds = report.findings.map((f) => f.id).toSet();
-      expect(ruleIds, isNot(contains('GRADLE_DEPENDENCY_RESOLUTION_FAILED')));
-    });
+        final ruleIds = report.findings.map((f) => f.id).toSet();
+        expect(ruleIds, isNot(contains('GRADLE_DEPENDENCY_RESOLUTION_FAILED')));
+      },
+    );
 
     test('BuildDoctorEngine respects suppressions in ProjectConfig', () async {
       final configYaml = '''

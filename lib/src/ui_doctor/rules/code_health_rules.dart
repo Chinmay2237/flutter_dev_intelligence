@@ -37,7 +37,8 @@ class _WidgetClassVisitor extends RecursiveAstVisitor<void> {
   @override
   void visitClassDeclaration(ClassDeclaration node) {
     final superclass = node.extendsClause?.superclass.toString();
-    final isWidgetClass = superclass == 'StatelessWidget' ||
+    final isWidgetClass =
+        superclass == 'StatelessWidget' ||
         superclass == 'StatefulWidget' ||
         (superclass != null && superclass.startsWith('State'));
 
@@ -74,6 +75,7 @@ class _WidgetClassVisitor extends RecursiveAstVisitor<void> {
 
 /// Rule detecting debugPrint or print statements left in production source code.
 class DebugPrintInProdRule extends UiDoctorRule {
+  /// Creates a new [DebugPrintInProdRule] instance.
   const DebugPrintInProdRule();
 
   @override
@@ -121,7 +123,8 @@ class DebugPrintInProdRule extends UiDoctorRule {
           severity: defaultSeverity,
           confidence: defaultConfidence,
           summary: 'Use of "$methodName()" found at $relativePath:$line.',
-          likelyCause: 'Raw debug logging statements degrade console performance and leak debug information in production builds.',
+          likelyCause:
+              'Raw debug logging statements degrade console performance and leak debug information in production builds.',
           source: 'ui_doctor',
           filePath: relativePath,
           line: line,
@@ -136,7 +139,8 @@ class DebugPrintInProdRule extends UiDoctorRule {
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Remove "$methodName()" or wrap with debug check (e.g. if (kDebugMode)) or structured logging package.',
+              action:
+                  'Remove "$methodName()" or wrap with debug check (e.g. if (kDebugMode)) or structured logging package.',
             ),
           ],
         ),
@@ -148,7 +152,9 @@ class DebugPrintInProdRule extends UiDoctorRule {
 
   bool _isGuardedByDebugMode(AstNode node) {
     AstNode? current = node.parent;
-    while (current != null && current is! MethodDeclaration && current is! FunctionDeclaration) {
+    while (current != null &&
+        current is! MethodDeclaration &&
+        current is! FunctionDeclaration) {
       if (current is IfStatement) {
         final cond = current.expression.toSource();
         if (cond.contains('kDebugMode')) return true;
@@ -161,8 +167,10 @@ class DebugPrintInProdRule extends UiDoctorRule {
 
 /// Rule detecting excessively large build() methods.
 class LargeBuildMethodRule extends UiDoctorRule {
+  /// Creates a new [LargeBuildMethodRule] instance with optional [maxLines] threshold.
   const LargeBuildMethodRule({this.maxLines = 100});
 
+  /// Maximum allowed line count for a build method before flagging.
   final int maxLines;
 
   @override
@@ -211,8 +219,10 @@ class LargeBuildMethodRule extends UiDoctorRule {
           category: category,
           severity: defaultSeverity,
           confidence: defaultConfidence,
-          summary: 'The build() method in widget "$className" spans $totalLines lines (exceeds $maxLines lines threshold).',
-          likelyCause: 'Large build methods degrade code maintainability, readability, and refactorability.',
+          summary:
+              'The build() method in widget "$className" spans $totalLines lines (exceeds $maxLines lines threshold).',
+          likelyCause:
+              'Large build methods degrade code maintainability, readability, and refactorability.',
           source: 'ui_doctor',
           filePath: relativePath,
           line: startLine,
@@ -220,15 +230,18 @@ class LargeBuildMethodRule extends UiDoctorRule {
           evidence: [
             EvidenceReference(
               label: 'Method scope',
-              value: '$className.build() spans lines $startLine-$endLine ($totalLines lines)',
+              value:
+                  '$className.build() spans lines $startLine-$endLine ($totalLines lines)',
               lineNumber: startLine,
               type: 'source',
             ),
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Consider extracting independent sub-widgets or helper methods for maintainability.',
-              details: 'This is a maintainability recommendation; size alone does not prove runtime performance degradation.',
+              action:
+                  'Consider extracting independent sub-widgets or helper methods for maintainability.',
+              details:
+                  'This is a maintainability recommendation; size alone does not prove runtime performance degradation.',
             ),
           ],
         ),
@@ -241,8 +254,10 @@ class LargeBuildMethodRule extends UiDoctorRule {
 
 /// Rule detecting oversized Widget classes.
 class LargeWidgetClassRule extends UiDoctorRule {
+  /// Creates a new [LargeWidgetClassRule] instance with optional [maxLines] threshold.
   const LargeWidgetClassRule({this.maxLines = 300});
 
+  /// Maximum allowed line count for a Widget class before flagging.
   final int maxLines;
 
   @override
@@ -290,8 +305,10 @@ class LargeWidgetClassRule extends UiDoctorRule {
           category: category,
           severity: defaultSeverity,
           confidence: defaultConfidence,
-          summary: 'Widget class "$className" spans $totalLines lines (exceeds $maxLines lines threshold).',
-          likelyCause: 'Oversized widget classes combine multiple responsibilities, making maintenance and testing difficult.',
+          summary:
+              'Widget class "$className" spans $totalLines lines (exceeds $maxLines lines threshold).',
+          likelyCause:
+              'Oversized widget classes combine multiple responsibilities, making maintenance and testing difficult.',
           source: 'ui_doctor',
           filePath: relativePath,
           line: startLine,
@@ -299,14 +316,16 @@ class LargeWidgetClassRule extends UiDoctorRule {
           evidence: [
             EvidenceReference(
               label: 'Class bounds',
-              value: 'Class $className spans lines $startLine-$endLine ($totalLines lines)',
+              value:
+                  'Class $className spans lines $startLine-$endLine ($totalLines lines)',
               lineNumber: startLine,
               type: 'source',
             ),
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Refactor class responsibilities into separate controller logic and focused UI widgets.',
+              action:
+                  'Refactor class responsibilities into separate controller logic and focused UI widgets.',
             ),
           ],
         ),

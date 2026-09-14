@@ -7,6 +7,7 @@ import 'ui_rule_base.dart';
 
 /// Checks for asset declaration issues in pubspec.yaml and on the filesystem.
 class AssetMissingFileRule extends UiDoctorRule {
+  /// Creates a new [AssetMissingFileRule] instance.
   const AssetMissingFileRule();
 
   @override
@@ -33,7 +34,9 @@ class AssetMissingFileRule extends UiDoctorRule {
     PubspecAnalysisResult? pubspecResult,
   }) {
     final findings = <DiagnosticFinding>[];
-    final pubspecFile = File('$projectPath${Platform.pathSeparator}pubspec.yaml');
+    final pubspecFile = File(
+      '$projectPath${Platform.pathSeparator}pubspec.yaml',
+    );
     if (!pubspecFile.existsSync()) return findings;
 
     try {
@@ -41,7 +44,8 @@ class AssetMissingFileRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) return findings;
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+        return findings;
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;
@@ -50,8 +54,12 @@ class AssetMissingFileRule extends UiDoctorRule {
         final assetPath = rawAsset.toString().trim();
         if (assetPath.isEmpty) continue;
 
-        final normalizedRelPath = assetPath.replaceAll('/', Platform.pathSeparator);
-        final fullPath = '$projectPath${Platform.pathSeparator}$normalizedRelPath';
+        final normalizedRelPath = assetPath.replaceAll(
+          '/',
+          Platform.pathSeparator,
+        );
+        final fullPath =
+            '$projectPath${Platform.pathSeparator}$normalizedRelPath';
 
         final isDirectoryAsset = assetPath.endsWith('/');
 
@@ -65,8 +73,10 @@ class AssetMissingFileRule extends UiDoctorRule {
                 category: category,
                 severity: defaultSeverity,
                 confidence: defaultConfidence,
-                summary: 'Declared asset directory "$assetPath" was not found on disk.',
-                likelyCause: 'The directory specified under flutter.assets in pubspec.yaml does not exist.',
+                summary:
+                    'Declared asset directory "$assetPath" was not found on disk.',
+                likelyCause:
+                    'The directory specified under flutter.assets in pubspec.yaml does not exist.',
                 source: 'ui_doctor',
                 filePath: 'pubspec.yaml',
                 primaryStatus: PrimaryStatus.independent,
@@ -79,7 +89,8 @@ class AssetMissingFileRule extends UiDoctorRule {
                 ],
                 recommendations: [
                   FixSuggestion(
-                    action: 'Create the directory "$assetPath" or remove the entry from pubspec.yaml.',
+                    action:
+                        'Create the directory "$assetPath" or remove the entry from pubspec.yaml.',
                   ),
                 ],
               ),
@@ -95,8 +106,10 @@ class AssetMissingFileRule extends UiDoctorRule {
                 category: category,
                 severity: defaultSeverity,
                 confidence: defaultConfidence,
-                summary: 'Declared asset file "$assetPath" was not found on disk.',
-                likelyCause: 'The file specified under flutter.assets in pubspec.yaml does not exist at the designated path.',
+                summary:
+                    'Declared asset file "$assetPath" was not found on disk.',
+                likelyCause:
+                    'The file specified under flutter.assets in pubspec.yaml does not exist at the designated path.',
                 source: 'ui_doctor',
                 filePath: 'pubspec.yaml',
                 primaryStatus: PrimaryStatus.independent,
@@ -109,7 +122,8 @@ class AssetMissingFileRule extends UiDoctorRule {
                 ],
                 recommendations: [
                   FixSuggestion(
-                    action: 'Verify the file path or copy "$assetPath" into the project directory.',
+                    action:
+                        'Verify the file path or copy "$assetPath" into the project directory.',
                   ),
                 ],
               ),
@@ -125,6 +139,7 @@ class AssetMissingFileRule extends UiDoctorRule {
 
 /// Detects letter-case mismatches between declared pubspec asset paths and filesystem paths.
 class AssetCaseMismatchRule extends UiDoctorRule {
+  /// Creates a new [AssetCaseMismatchRule] instance.
   const AssetCaseMismatchRule();
 
   @override
@@ -151,7 +166,9 @@ class AssetCaseMismatchRule extends UiDoctorRule {
     PubspecAnalysisResult? pubspecResult,
   }) {
     final findings = <DiagnosticFinding>[];
-    final pubspecFile = File('$projectPath${Platform.pathSeparator}pubspec.yaml');
+    final pubspecFile = File(
+      '$projectPath${Platform.pathSeparator}pubspec.yaml',
+    );
     if (!pubspecFile.existsSync()) return findings;
 
     try {
@@ -159,7 +176,8 @@ class AssetCaseMismatchRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) return findings;
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+        return findings;
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;
@@ -168,16 +186,28 @@ class AssetCaseMismatchRule extends UiDoctorRule {
         final assetPath = rawAsset.toString().trim();
         if (assetPath.isEmpty || assetPath.endsWith('/')) continue;
 
-        final normalizedRelPath = assetPath.replaceAll('/', Platform.pathSeparator);
-        final file = File('$projectPath${Platform.pathSeparator}$normalizedRelPath');
+        final normalizedRelPath = assetPath.replaceAll(
+          '/',
+          Platform.pathSeparator,
+        );
+        final file = File(
+          '$projectPath${Platform.pathSeparator}$normalizedRelPath',
+        );
 
         final parentDir = file.parent;
         if (parentDir.existsSync()) {
-          final basename = file.uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
+          final basename = file.uri.pathSegments.lastWhere(
+            (s) => s.isNotEmpty,
+            orElse: () => '',
+          );
           final entities = parentDir.listSync();
           for (final entity in entities) {
-            final actualName = entity.uri.pathSegments.lastWhere((s) => s.isNotEmpty, orElse: () => '');
-            if (actualName.toLowerCase() == basename.toLowerCase() && actualName != basename) {
+            final actualName = entity.uri.pathSegments.lastWhere(
+              (s) => s.isNotEmpty,
+              orElse: () => '',
+            );
+            if (actualName.toLowerCase() == basename.toLowerCase() &&
+                actualName != basename) {
               findings.add(
                 DiagnosticFinding(
                   id: id,
@@ -185,8 +215,10 @@ class AssetCaseMismatchRule extends UiDoctorRule {
                   category: category,
                   severity: defaultSeverity,
                   confidence: defaultConfidence,
-                  summary: 'Asset filename casing in pubspec.yaml ("$basename") differs from disk ("$actualName").',
-                  likelyCause: 'File path casing in pubspec.yaml does not match filesystem exact case, which fails on case-sensitive OS environments like Linux CI.',
+                  summary:
+                      'Asset filename casing in pubspec.yaml ("$basename") differs from disk ("$actualName").',
+                  likelyCause:
+                      'File path casing in pubspec.yaml does not match filesystem exact case, which fails on case-sensitive OS environments like Linux CI.',
                   source: 'ui_doctor',
                   filePath: 'pubspec.yaml',
                   primaryStatus: PrimaryStatus.independent,
@@ -204,7 +236,8 @@ class AssetCaseMismatchRule extends UiDoctorRule {
                   ],
                   recommendations: [
                     FixSuggestion(
-                      action: 'Update pubspec.yaml asset entry to match exact filesystem case: "$actualName".',
+                      action:
+                          'Update pubspec.yaml asset entry to match exact filesystem case: "$actualName".',
                     ),
                   ],
                 ),
@@ -221,8 +254,10 @@ class AssetCaseMismatchRule extends UiDoctorRule {
 
 /// Detects oversized image assets exceeding 2MB file size.
 class AssetOversizedRule extends UiDoctorRule {
+  /// Creates a new [AssetOversizedRule] instance with optional [maxSizeBytes] threshold.
   const AssetOversizedRule({this.maxSizeBytes = 2097152});
 
+  /// Maximum allowed size in bytes for image asset files.
   final int maxSizeBytes;
 
   @override
@@ -249,7 +284,9 @@ class AssetOversizedRule extends UiDoctorRule {
     PubspecAnalysisResult? pubspecResult,
   }) {
     final findings = <DiagnosticFinding>[];
-    final pubspecFile = File('$projectPath${Platform.pathSeparator}pubspec.yaml');
+    final pubspecFile = File(
+      '$projectPath${Platform.pathSeparator}pubspec.yaml',
+    );
     if (!pubspecFile.existsSync()) return findings;
 
     try {
@@ -257,7 +294,8 @@ class AssetOversizedRule extends UiDoctorRule {
       if (doc is! YamlMap || !doc.containsKey('flutter')) return findings;
 
       final flutterMap = doc['flutter'];
-      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets')) return findings;
+      if (flutterMap is! YamlMap || !flutterMap.containsKey('assets'))
+        return findings;
 
       final assetsList = flutterMap['assets'];
       if (assetsList is! YamlList) return findings;
@@ -268,8 +306,12 @@ class AssetOversizedRule extends UiDoctorRule {
         final assetPath = rawAsset.toString().trim();
         if (assetPath.isEmpty) continue;
 
-        final normalizedRelPath = assetPath.replaceAll('/', Platform.pathSeparator);
-        final fullPath = '$projectPath${Platform.pathSeparator}$normalizedRelPath';
+        final normalizedRelPath = assetPath.replaceAll(
+          '/',
+          Platform.pathSeparator,
+        );
+        final fullPath =
+            '$projectPath${Platform.pathSeparator}$normalizedRelPath';
 
         if (assetPath.endsWith('/')) {
           final dir = Directory(fullPath);
@@ -294,12 +336,18 @@ class AssetOversizedRule extends UiDoctorRule {
     return findings;
   }
 
-  void _checkFile(File file, String projectPath, List<DiagnosticFinding> findings) {
+  void _checkFile(
+    File file,
+    String projectPath,
+    List<DiagnosticFinding> findings,
+  ) {
     final size = file.lengthSync();
     if (size > maxSizeBytes) {
       final sizeMb = (size / (1024 * 1024)).toStringAsFixed(2);
       final relPath = file.path.startsWith(projectPath)
-          ? file.path.substring(projectPath.length).replaceAll(RegExp(r'^[/\\]+'), '')
+          ? file.path
+                .substring(projectPath.length)
+                .replaceAll(RegExp(r'^[/\\]+'), '')
           : file.path;
 
       findings.add(
@@ -309,8 +357,10 @@ class AssetOversizedRule extends UiDoctorRule {
           category: category,
           severity: defaultSeverity,
           confidence: defaultConfidence,
-          summary: 'Asset "$relPath" is $sizeMb MB, exceeding recommended size threshold (2.0 MB).',
-          likelyCause: 'Uncompressed high-resolution images increase app download bundle size and memory overhead.',
+          summary:
+              'Asset "$relPath" is $sizeMb MB, exceeding recommended size threshold (2.0 MB).',
+          likelyCause:
+              'Uncompressed high-resolution images increase app download bundle size and memory overhead.',
           source: 'ui_doctor',
           filePath: relPath,
           primaryStatus: PrimaryStatus.independent,
@@ -323,7 +373,8 @@ class AssetOversizedRule extends UiDoctorRule {
           ],
           recommendations: [
             FixSuggestion(
-              action: 'Compress image asset using WebP, PNG resolution scaling, or vector SVG assets.',
+              action:
+                  'Compress image asset using WebP, PNG resolution scaling, or vector SVG assets.',
             ),
           ],
         ),

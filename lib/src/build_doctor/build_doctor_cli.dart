@@ -39,7 +39,9 @@ class BuildDoctorCli {
     }
 
     try {
-      final configResult = await ProjectConfig.findAndLoad(effectiveProjectPath);
+      final configResult = await ProjectConfig.findAndLoad(
+        effectiveProjectPath,
+      );
 
       final report = await BuildDoctorEngine.analyze(
         options: BuildDoctorEngineOptions(
@@ -55,21 +57,24 @@ class BuildDoctorCli {
         'json' => JsonReporter.render(report),
         'markdown' => MarkdownReporter.render(report),
         _ => TerminalReporter.render(
-            report,
-            colorMode: colorMode,
-            useAscii: useAscii,
-          ),
+          report,
+          colorMode: colorMode,
+          useAscii: useAscii,
+        ),
       };
 
       if (outputPath != null) {
         try {
           await File(outputPath).parent.create(recursive: true);
-          final fileContent = (outputFormat == 'terminal' && colorMode != ColorMode.always)
+          final fileContent =
+              (outputFormat == 'terminal' && colorMode != ColorMode.always)
               ? TerminalReporter.stripAnsi(rendered)
               : rendered;
           await File(outputPath).writeAsString('$fileContent\n');
         } catch (e) {
-          stderr.writeln('Error: Failed to write output file: $outputPath ($e)');
+          stderr.writeln(
+            'Error: Failed to write output file: $outputPath ($e)',
+          );
           return 3;
         }
       }
@@ -93,4 +98,3 @@ class BuildDoctorCli {
     }
   }
 }
-
