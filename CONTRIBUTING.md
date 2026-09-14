@@ -79,6 +79,41 @@ dart pub publish --dry-run
 
 ---
 
+## Git Workflow & Conventions
+
+### Branch Naming Convention
+
+All feature development, bug fixes, refactoring, and release preparation must be performed in dedicated branches following this pattern:
+
+- **Features:** `feature/<short-description>` (e.g. `feature/ui-doctor`, `feature/accessibility-rules`)
+- **Bug Fixes:** `fix/<short-description>` (e.g. `fix/asset-case-mismatch`, `fix/gradle-parser`)
+- **Refactoring:** `refactor/<short-description>` (e.g. `refactor/diagnostic-engine`)
+- **Documentation:** `docs/<short-description>` (e.g. `docs/cli-reference`)
+- **Performance:** `perf/<short-description>` (e.g. `perf/source-analysis`)
+- **CI / Build:** `ci/<short-description>` or `build/<short-description>`
+- **Releases:** `release/<version>` (e.g. `release/1.3.0`)
+- **Hotfixes:** `hotfix/<short-description>` (e.g. `hotfix/1.2.2`)
+
+### Conventional Commit Messages
+
+All commit messages should follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```text
+<type>(<optional-scope>): <imperative description>
+```
+
+**Allowed Types:** `feat`, `fix`, `docs`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`
+
+**Examples:**
+- `feat(ui-doctor): add image semantics detection`
+- `fix(build-doctor): prioritize root compiler errors`
+- `docs(readme): clarify UI Doctor CLI flags`
+- `refactor(reporting): simplify markdown renderer`
+- `test(reporting): cover terminal report output`
+- `chore(release): prepare 1.3.0`
+
+---
+
 ## Architecture Guidelines
 
 - **Deterministic Core:** Analyzers must yield reproducible findings for identical inputs.
@@ -95,3 +130,4 @@ dart pub publish --dry-run
 ## License
 
 By contributing to `flutter_dev_intelligence`, you agree that your contributions will be licensed under the package's [MIT License](LICENSE).
+
