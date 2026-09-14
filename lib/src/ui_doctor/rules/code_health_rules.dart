@@ -210,7 +210,7 @@ class LargeBuildMethodRule extends UiDoctorRule {
       final endLine = ast.lineInfo.getLocation(method.end).lineNumber;
       final totalLines = endLine - startLine + 1;
 
-      final className = (method.parent as ClassDeclaration).name.lexeme;
+      final className = _extractClassName(method.parent as ClassDeclaration);
 
       findings.add(
         DiagnosticFinding(
@@ -296,7 +296,7 @@ class LargeWidgetClassRule extends UiDoctorRule {
       final startLine = ast.lineInfo.getLocation(clazz.offset).lineNumber;
       final endLine = ast.lineInfo.getLocation(clazz.end).lineNumber;
       final totalLines = endLine - startLine + 1;
-      final className = clazz.name.lexeme;
+      final className = _extractClassName(clazz);
 
       findings.add(
         DiagnosticFinding(
@@ -333,5 +333,16 @@ class LargeWidgetClassRule extends UiDoctorRule {
     }
 
     return findings;
+  }
+}
+
+String _extractClassName(ClassDeclaration clazz) {
+  try {
+    dynamic nameObj = (clazz as dynamic).name;
+    if (nameObj == null) return 'WidgetClass';
+    if (nameObj is String) return nameObj;
+    return (nameObj.lexeme ?? nameObj.toString()).toString();
+  } catch (_) {
+    return 'WidgetClass';
   }
 }
