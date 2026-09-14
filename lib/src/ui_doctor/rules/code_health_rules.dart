@@ -57,9 +57,9 @@ class _WidgetClassVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    if (node.name.lexeme == 'build') {
-      final parentClass = node.parent;
-      if (parentClass is ClassDeclaration) {
+    if (_getMethodName(node) == 'build') {
+      final parentClass = _findParentClass(node);
+      if (parentClass != null) {
         final startLine = lineInfo.getLocation(node.offset).lineNumber;
         final endLine = lineInfo.getLocation(node.end).lineNumber;
         final buildLineCount = endLine - startLine + 1;
@@ -105,7 +105,7 @@ class DebugPrintInProdRule extends UiDoctorRule {
   }) {
     final findings = <DiagnosticFinding>[];
     final visitor = _DebugPrintVisitor();
-    ast.visitChildren(visitor);
+    ast.accept(visitor);
 
     final lineInfo = ast.lineInfo;
 
@@ -199,18 +199,22 @@ class LargeBuildMethodRule extends UiDoctorRule {
     required CompilationUnit ast,
   }) {
     final findings = <DiagnosticFinding>[];
+    final lineInfo = LineInfo.fromContent(content);
     final visitor = _WidgetClassVisitor(
-      lineInfo: ast.lineInfo,
+      lineInfo: lineInfo,
       maxBuildMethodLines: maxLines,
     );
-    ast.visitChildren(visitor);
+    ast.accept(visitor);
 
     for (final method in visitor.largeBuildMethods) {
-      final startLine = ast.lineInfo.getLocation(method.offset).lineNumber;
-      final endLine = ast.lineInfo.getLocation(method.end).lineNumber;
+      final startLine = lineInfo.getLocation(method.offset).lineNumber;
+      final endLine = lineInfo.getLocation(method.end).lineNumber;
       final totalLines = endLine - startLine + 1;
 
-      final className = _extractClassName(method.parent as ClassDeclaration);
+      final parentClass = _findParentClass(method);
+      final className = parentClass != null
+          ? _extractClassName(parentClass)
+          : 'WidgetClass';
 
       findings.add(
         DiagnosticFinding(
@@ -286,15 +290,16 @@ class LargeWidgetClassRule extends UiDoctorRule {
     required CompilationUnit ast,
   }) {
     final findings = <DiagnosticFinding>[];
+    final lineInfo = LineInfo.fromContent(content);
     final visitor = _WidgetClassVisitor(
-      lineInfo: ast.lineInfo,
+      lineInfo: lineInfo,
       maxWidgetClassLines: maxLines,
     );
-    ast.visitChildren(visitor);
+    ast.accept(visitor);
 
     for (final clazz in visitor.largeClasses) {
-      final startLine = ast.lineInfo.getLocation(clazz.offset).lineNumber;
-      final endLine = ast.lineInfo.getLocation(clazz.end).lineNumber;
+      final startLine = lineInfo.getLocation(clazz.offset).lineNumber;
+      final endLine = lineInfo.getLocation(clazz.end).lineNumber;
       final totalLines = endLine - startLine + 1;
       final className = _extractClassName(clazz);
 
@@ -336,13 +341,56 @@ class LargeWidgetClassRule extends UiDoctorRule {
   }
 }
 
+ClassDeclaration? _findParentClass(AstNode node) {
+  AstNode? current = node.parent;
+  while (current != null && current is! ClassDeclaration) {
+    current = current.parent;
+  }
+  return current as ClassDeclaration?;
+}
+
+String _getMethodName(MethodDeclaration node) {
+  try {
+    final dynamic n = (node as dynamic).name;
+    if (n != null) {
+      try {
+        final dynamic lex = n.lexeme;
+        if (lex != null) return lex.toString();
+      } catch (_) {}
+      try {
+        final dynamic nm = n.name;
+        if (nm != null) return nm.toString();
+      } catch (_) {}
+      return n.toString();
+    }
+  } catch (_) {}
+  try {
+    final dynamic nt = (node as dynamic).nameToken;
+    if (nt != null) {
+      final dynamic lex = nt.lexeme;
+      if (lex != null) return lex.toString();
+      return nt.toString();
+    }
+  } catch (_) {}
+  return '';
+}
+
 String _extractClassName(ClassDeclaration clazz) {
   try {
-    dynamic nameObj = (clazz as dynamic).name;
-    if (nameObj == null) return 'WidgetClass';
-    if (nameObj is String) return nameObj;
-    return (nameObj.lexeme ?? nameObj.toString()).toString();
-  } catch (_) {
-    return 'WidgetClass';
-  }
+    final match = RegExp(
+      r'class\s+([A-Za-z0-9_$]+)',
+    ).firstMatch(clazz.toSource());
+    if (match != null && match.group(1) != null) {
+      return match.group(1)!;
+    }
+  } catch (_) {}
+  try {
+    final dynamic nameToken = (clazz as dynamic).name;
+    if (nameToken != null) {
+      final dynamic lex = nameToken.lexeme;
+      if (lex != null) return lex.toString();
+      return nameToken.toString();
+    }
+  } catch (_) {}
+  return 'WidgetClass';
 }
